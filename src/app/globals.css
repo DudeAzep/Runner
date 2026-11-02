@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   RUNNER design tokens
+   Near-black charcoal surfaces, violet primary, electric green signal.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-ink-950: #07070a;
+  --color-ink-900: #0b0b0f;
+  --color-ink-850: #101016;
+  --color-ink-800: #14141b;
+  --color-ink-750: #191921;
+  --color-ink-700: #20202a;
+  --color-ink-600: #2a2a36;
+  --color-ink-500: #3a3a48;
+
+  --color-fg: #ededf3;
+  --color-fg-muted: #a0a0b2;
+  --color-fg-subtle: #6d6d80;
+
+  --color-violet-300: #c4b5fd;
+  --color-violet-400: #a78bfa;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-900: #2a1a52;
+
+  --color-volt-300: #8cfcc4;
+  --color-volt-400: #4cf7a6;
+  --color-volt-500: #22e88c;
+  --color-volt-900: #0b3a26;
+
+  --color-amber-400: #f5bd4f;
+  --color-rose-400: #f7697a;
+  --color-sky-400: #60c3fa;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-dash: dash 2.4s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes dash {
+    to {
+      stroke-dashoffset: -40;
+    }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--color-ink-900);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-violet-500) 45%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-violet-400);
+    outline-offset: 2px;
+  }
+  input,
+  select,
+  textarea {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  .surface {
+    background: linear-gradient(180deg, color-mix(in oklab, var(--color-ink-800) 92%, white 0.6%) 0%, var(--color-ink-850) 100%);
+    border: 1px solid var(--color-ink-700);
+    border-radius: var(--radius-lg);
+  }
+  .surface-hover {
+    transition:
+      border-color 180ms ease,
+      transform 180ms ease,
+      background-color 180ms ease;
+  }
+  .surface-hover:hover {
+    border-color: var(--color-ink-500);
+    transform: translateY(-1px);
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, white 4%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, white 4%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 80%);
+  }
+  .text-gradient {
+    background: linear-gradient(92deg, var(--color-fg) 10%, var(--color-violet-300) 55%, var(--color-volt-400) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-fg-subtle);
+    font-weight: 500;
+  }
+  .field {
+    width: 100%;
+    background: var(--color-ink-900);
+    border: 1px solid var(--color-ink-600);
+    border-radius: var(--radius-md);
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-fg);
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .field::placeholder {
+    color: var(--color-fg-subtle);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-violet-500);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-violet-500) 22%, transparent);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-rose-400);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Solana wallet-adapter modal — align with RUNNER theme */
+.wallet-adapter-modal-wrapper {
+  background: var(--color-ink-850) !important;
+  border: 1px solid var(--color-ink-600);
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 30px 80px -20px rgb(0 0 0 / 0.8) !important;
+  font-family: var(--font-sans) !important;
+}
+.wallet-adapter-modal-title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  font-family: var(--font-sans) !important;
+  border-radius: var(--radius-md) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background-color: var(--color-ink-700) !important;
+}
+.wallet-adapter-modal-button-close {
+  background: var(--color-ink-700) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
