@@ -7,8 +7,8 @@ function hash(s: string): number {
 }
 
 /**
- * Deterministic monogram logo. No third-party images are loaded for demo
- * projects; a real logo URL can be passed once projects upload one.
+ * Coin logo. Shows the coin's image when `src` is given (e.g. from DexScreener),
+ * over a deterministic monogram that doubles as the fallback.
  */
 export function ProjectLogo({
   ticker,
@@ -29,11 +29,6 @@ export function ProjectLogo({
   const angle = (h >> 16) % 360;
   const letters = ticker.slice(0, 2);
 
-  if (src) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={`${name} logo`} width={size} height={size} className={cn("rounded-md object-cover", className)} />;
-  }
-
   return (
     <span
       role="img"
@@ -48,6 +43,19 @@ export function ProjectLogo({
       <span className="font-mono font-semibold tracking-tight text-white/95" style={{ fontSize: size * 0.34 }}>
         {letters}
       </span>
+      {src && (
+        // Sits on top of the monogram; if the image fails to load, the monogram shows through.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
     </span>
   );
 }

@@ -16,6 +16,7 @@ import { getRepositoryForRequest } from "@/lib/data";
 import { fromBaseUnits } from "@/lib/economics/rewards";
 import { CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
 import { formatDate, formatDateTime, formatInt, formatUsdCents, formatUsdCompact } from "@/lib/format";
+import { getLiveMarketInfo } from "@/lib/solana/market";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -58,6 +59,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
   const txUrl = (sig: string) => `https://solscan.io/tx/${sig}${cluster === "devnet" ? "?cluster=devnet" : ""}`;
   const pkg = CAMPAIGN_PACKAGES[c.campaignPackage];
   const spentCents = purchases.reduce((s, p) => s + p.usdcSpentCents, 0);
+  const logoUrl = c.source === "demo" ? null : ((await getLiveMarketInfo([c.tokenAddress])).get(c.tokenAddress)?.imageUrl ?? null);
 
   return (
     <Container className="pt-8">
@@ -68,7 +70,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
       {/* Header */}
       <header className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-4">
-          <ProjectLogo ticker={c.ticker} name={c.projectName} size={64} />
+          <ProjectLogo ticker={c.ticker} name={c.projectName} size={64} src={logoUrl} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-3xl font-semibold tracking-tight">{c.projectName}</h1>

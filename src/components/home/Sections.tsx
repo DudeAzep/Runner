@@ -22,7 +22,7 @@ const STEPS = [
   {
     icon: Users,
     title: "Holders receive distributions",
-    body: "Purchased tokens are distributed pro-rata to eligible RUNNER holders based on a published balance snapshot.",
+    body: "Purchased tokens are split among eligible RUNNER holders based on how much each one holds, using a published balance snapshot.",
   },
 ];
 

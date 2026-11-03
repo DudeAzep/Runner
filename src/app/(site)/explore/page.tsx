@@ -7,7 +7,7 @@ import { Container, PageHeader } from "@/components/layout/PageHeader";
 import { ButtonLink } from "@/components/ui/Button";
 import { getRepositoryForRequest } from "@/lib/data";
 import { cn } from "@/lib/cn";
-import { getLiveMarketCaps } from "@/lib/solana/market";
+import { getMarketInfoFor } from "@/lib/solana/market";
 import type { CampaignSort } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Explore Campaigns" };
@@ -42,7 +42,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const isTeasers = filter === "upcoming";
   const all = repo.listCampaigns();
   const pending = repo.listPendingApplicantMints();
-  const campaigns = isTeasers ? [] : repo.listCampaigns({ filter, sort, search: q });
+  let campaigns = isTeasers ? [] : repo.listCampaigns({ filter, sort, search: q });
   const counts: Record<ExploreFilter, number> = {
     all: all.length,
     approved: all.filter((c) => c.status === "active" || c.status === "upcoming").length,
@@ -50,11 +50,21 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   };
 
   // Teasers carry only a live market cap. Names and addresses stay on the server.
-  let teasers: { key: string; marketCapUsd: number | null }[] = [];
+  let teasers: { key: string; marketCapUsd: number | null; demo: boolean }[] = [];
   if (isTeasers && pending.length > 0) {
-    const caps = await getLiveMarketCaps(pending.map((p) => p.contractAddress));
-    teasers = pending.map((p) => ({ key: p.id, marketCapUsd: caps.get(p.contractAddress) ?? null }));
+    // Only the market cap is passed on; the image would identify the coin, so it's dropped here.
+    const info = await getMarketInfoFor(pending.map((p) => ({ key: p.id, mint: p.contractAddress, demo: p.demo })));
+    teasers = pending.map((p) => ({ key: p.id, marketCapUsd: info.get(p.id)?.marketCapUsd ?? null, demo: p.demo }));
     if (sort === "market_cap") teasers.sort((a, b) => (b.marketCapUsd ?? -1) - (a.marketCapUsd ?? -1));
+  }
+
+  // Live market caps for campaign cards; "Market capitalization" sort uses the live value.
+  const market = await getMarketInfoFor(
+    campaigns.map((c) => ({ key: c.id, mint: c.tokenAddress, demo: c.source === "demo", demoBaseUsd: c.marketCapAtScreeningUsd })),
+  );
+  const capOf = (id: string) => market.get(id)?.marketCapUsd ?? -1;
+  if (sort === "market_cap") {
+    campaigns = [...campaigns].sort((a, b) => capOf(b.id) - capOf(a.id));
   }
   const teaserSorts = SORTS.filter((s) => s.id !== "allocation");
 
@@ -78,7 +88,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         description={
           isTeasers
             ? "Projects that have applied and are still in screening. Details stay hidden until a project is approved; the market cap shown is live."
-            : "Every campaign below passed RUNNER's independent screening. Figures are captured at screening time and do not reflect current market conditions."
+            : "Every campaign below passed RUNNER's independent screening. Market cap is live; liquidity and holder figures were captured at screening time."
         }
       />
 
@@ -151,7 +161,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         teasers.length > 0 ? (
           <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {teasers.map((t) => (
-              <TeaserCard key={t.key} marketCapUsd={t.marketCapUsd} />
+              <TeaserCard key={t.key} marketCapUsd={t.marketCapUsd} demo={t.demo} />
             ))}
           </div>
         ) : (
@@ -164,7 +174,12 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
       ) : campaigns.length > 0 ? (
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {campaigns.map((c) => (
-            <CampaignCard key={c.id} campaign={c} />
+            <CampaignCard
+              key={c.id}
+              campaign={c}
+              liveMarketCapUsd={market.get(c.id)?.marketCapUsd ?? null}
+              logoUrl={market.get(c.id)?.imageUrl}
+            />
           ))}
         </div>
       ) : (

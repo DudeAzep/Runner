@@ -18,11 +18,26 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function CampaignCard({ campaign: c, compact = false }: { campaign: Campaign; compact?: boolean }) {
+/**
+ * `liveMarketCapUsd`: pass a value (or null for "not trading") to show a live
+ * market cap row; leave it undefined to keep the card as before.
+ */
+export function CampaignCard({
+  campaign: c,
+  compact = false,
+  liveMarketCapUsd,
+  logoUrl,
+}: {
+  campaign: Campaign;
+  compact?: boolean;
+  liveMarketCapUsd?: number | null;
+  logoUrl?: string | null;
+}) {
+  const showLive = liveMarketCapUsd !== undefined;
   return (
     <article className="surface surface-hover group relative flex flex-col p-5">
       <div className="flex items-start gap-3.5">
-        <ProjectLogo ticker={c.ticker} name={c.projectName} />
+        <ProjectLogo ticker={c.ticker} name={c.projectName} src={logoUrl} />
         <div className="min-w-0 flex-1">
           <h3 className="flex items-center gap-2 text-[15px] font-semibold text-fg">
             <Link href={`/campaigns/${c.slug}`} className="truncate after:absolute after:inset-0 after:content-['']">
@@ -40,6 +55,21 @@ export function CampaignCard({ campaign: c, compact = false }: { campaign: Campa
         <RiskBadge level={c.riskLevel} />
         <SourceBadge source={c.source} />
       </div>
+
+      {showLive && (
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-md border border-volt-400/25 bg-volt-400/[0.06] px-3.5 py-3 shadow-[0_0_24px_-8px] shadow-volt-400/40">
+          <span className="label flex items-center gap-2 text-volt-400">
+            <span className="relative flex size-2" aria-hidden>
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-volt-400 opacity-60 motion-reduce:hidden" />
+              <span className="relative inline-flex size-2 rounded-full bg-volt-400" />
+            </span>
+            {c.source === "demo" ? "Market cap (simulated)" : "Live market cap"}
+          </span>
+          <span className="tabular text-2xl font-bold tracking-tight text-volt-400 [text-shadow:0_0_18px_rgb(76_247_166/0.45)]">
+            {liveMarketCapUsd != null ? formatUsdCompact(liveMarketCapUsd) : "Not trading"}
+          </span>
+        </div>
+      )}
 
       <dl className="mt-5 grid grid-cols-3 gap-4 border-t border-ink-700 pt-4">
         <Metric label="Mcap @ screen" value={c.marketCapAtScreeningUsd != null ? formatUsdCompact(c.marketCapAtScreeningUsd) : "—"} />

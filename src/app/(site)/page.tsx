@@ -51,7 +51,9 @@ export default async function HomePage() {
               Participation does not guarantee token appreciation, liquidity, or profits. Screening is not an endorsement.
             </p>
           </div>
-          {heroCampaign && <HeroFlow campaign={heroCampaign} />}
+          {heroCampaign && (
+            <HeroFlow campaign={heroCampaign} screening={repo.getCampaignDetail(heroCampaign.slug)?.screening ?? null} />
+          )}
         </Container>
       </section>
 

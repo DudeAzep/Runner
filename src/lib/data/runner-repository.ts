@@ -215,11 +215,11 @@ export class RunnerRepository {
    * Unpaid applications are left out so spam submissions never appear publicly.
    * Server-only: the page must never pass these fields to the browser.
    */
-  listPendingApplicantMints(): { id: string; contractAddress: string; createdAt: string }[] {
+  listPendingApplicantMints(): { id: string; contractAddress: string; createdAt: string; demo: boolean }[] {
     return store()
       .applications.filter((a) => (a.status === "submitted" || a.status === "under_review") && a.paymentStatus !== "awaiting_payment")
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-      .map((a) => ({ id: a.id, contractAddress: a.contractAddress, createdAt: a.createdAt }));
+      .map((a) => ({ id: a.id, contractAddress: a.contractAddress, createdAt: a.createdAt, demo: a.source === "demo" }));
   }
 
   listApplications(opts: { search?: string; status?: ApplicationStatus | "all" } = {}): Application[] {

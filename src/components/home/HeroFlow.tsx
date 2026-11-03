@@ -6,17 +6,23 @@ import { SourceBadge } from "@/components/ui/Badge";
 import { calculateCampaignAllocation } from "@/lib/economics/allocation";
 import { estimateUsdReward } from "@/lib/economics/rewards";
 import { formatPercent, formatUsdCents } from "@/lib/format";
-import type { Campaign } from "@/lib/types";
+import { SCREENING_CRITERIA, type Campaign, type Screening } from "@/lib/types";
+
+/** A screening check counts as passed at 6/10 or higher (below that the report shows it amber/red). */
+const PASS_SCORE = 6;
 
 /** Hero visual: how one campaign fee flows to holders, using a real (demo) campaign record. */
-export function HeroFlow({ campaign }: { campaign: Campaign }) {
+export function HeroFlow({ campaign, screening }: { campaign: Campaign; screening: Screening | null }) {
   const a = calculateCampaignAllocation(campaign.totalCampaignFeeCents);
   const example = estimateUsdReward(250_000n, 100_000_000n, a.rewardUsdCents);
+  const total = SCREENING_CRITERIA.length;
+  const passed = screening ? SCREENING_CRITERIA.filter((c) => screening[c.key] >= PASS_SCORE).length : null;
+  const screeningValue = passed != null ? `${passed}/${total} checks · ${Math.round((passed / total) * 100)}%` : `${total} checks`;
   const rows = [
-    { icon: ShieldCheck, label: "Screening passed", value: "8 criteria", tone: "text-volt-400" },
+    { icon: ShieldCheck, label: "Screening passed", value: screeningValue, tone: "text-volt-400" },
     { icon: Coins, label: "Campaign fee", value: formatUsdCents(a.totalUsdCents) + " USDC", tone: "text-fg" },
     { icon: Landmark, label: "Treasury buys $" + campaign.ticker, value: formatUsdCents(a.rewardUsdCents), tone: "text-volt-400" },
-    { icon: Users, label: "Distributed pro-rata", value: "to eligible holders", tone: "text-fg-muted" },
+    { icon: Users, label: "Split among holders", value: "by how much you hold", tone: "text-fg-muted" },
   ];
   return (
     <div className="relative">
