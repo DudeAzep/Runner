@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Layers, LayoutDashboard } from "lucide-react";
+import { FileText, Layers, LayoutDashboard, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -9,6 +9,7 @@ const ITEMS = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/admin/applications", label: "Applications", icon: FileText },
   { href: "/admin/campaigns", label: "Campaigns", icon: Layers },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminNav() {

@@ -1,13 +1,19 @@
-import { RISK_FLAG_OPTIONS, RISK_LEVELS, SCREENING_CRITERIA, type Screening } from "@/lib/types";
+import { RISK_FLAG_OPTIONS, RISK_LEVELS, SCREENING_CRITERIA, type Screening, type TokenReport } from "@/lib/types";
 
 function triState(v: boolean | null | undefined) {
   return v === true ? "yes" : v === false ? "no" : "";
 }
 
 /** Structured screening inputs. Rendered inside an AdminForm. */
-export function ScreeningFields({ screening }: { screening: Screening | null }) {
+export function ScreeningFields({ screening, report }: { screening: Screening | null; report?: TokenReport | null }) {
   const s = screening;
+  // Unscreened applications are pre-filled from the latest on-chain report.
+  const r = !s && report && report.decimals != null ? report : null;
   const flags = new Set(s?.riskFlags ?? []);
+  if (r?.mintAuthority) flags.add("Mint authority active");
+  if (r?.freezeAuthority) flags.add("Freeze authority active");
+  if (r?.top10Pct != null && r.top10Pct > 30) flags.add("Top 10 holders > 30%");
+  const metric = (v: number | null | undefined, fromReport: number | null | undefined) => v ?? fromReport ?? null;
   return (
     <div className="space-y-6">
       <div>
@@ -35,10 +41,10 @@ export function ScreeningFields({ screening }: { screening: Screening | null }) 
         <h3 className="label">Metrics at screening</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ["marketCapUsd", "Market cap (USD)", s?.marketCapUsd],
-            ["liquidityUsd", "Liquidity (USD)", s?.liquidityUsd],
-            ["holderCount", "Holder count", s?.holderCount],
-            ["top10HolderPct", "Top-10 holders %", s?.top10HolderPct],
+            ["marketCapUsd", "Market cap (USD)", metric(s?.marketCapUsd, r ? Math.round(r.marketCapUsd ?? r.fdvUsd ?? 0) || null : null)],
+            ["liquidityUsd", "Liquidity (USD)", metric(s?.liquidityUsd, r?.liquidityUsd != null ? Math.round(r.liquidityUsd) : null)],
+            ["holderCount", "Holder count", metric(s?.holderCount, r?.holderCount)],
+            ["top10HolderPct", "Top-10 holders %", metric(s?.top10HolderPct, r?.top10Pct != null ? Number(r.top10Pct.toFixed(2)) : null)],
           ].map(([name, label, val]) => (
             <label key={String(name)} className="block">
               <span className="text-xs text-fg-muted">{String(label)}</span>
@@ -47,7 +53,7 @@ export function ScreeningFields({ screening }: { screening: Screening | null }) 
           ))}
           <label className="block">
             <span className="text-xs text-fg-muted">Mint authority revoked</span>
-            <select name="mintAuthorityRevoked" defaultValue={triState(s?.mintAuthorityRevoked)} className="field mt-1">
+            <select name="mintAuthorityRevoked" defaultValue={triState(s ? s.mintAuthorityRevoked : r ? r.mintAuthority === null : null)} className="field mt-1">
               <option value="">Unknown</option>
               <option value="yes">Yes — revoked</option>
               <option value="no">No — active</option>
@@ -55,7 +61,7 @@ export function ScreeningFields({ screening }: { screening: Screening | null }) 
           </label>
           <label className="block">
             <span className="text-xs text-fg-muted">Freeze authority revoked</span>
-            <select name="freezeAuthorityRevoked" defaultValue={triState(s?.freezeAuthorityRevoked)} className="field mt-1">
+            <select name="freezeAuthorityRevoked" defaultValue={triState(s ? s.freezeAuthorityRevoked : r ? r.freezeAuthority === null : null)} className="field mt-1">
               <option value="">Unknown</option>
               <option value="yes">Yes — revoked</option>
               <option value="no">No — active</option>

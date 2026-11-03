@@ -11,7 +11,8 @@ import { formatInt } from "@/lib/format";
 
 export default async function HomePage() {
   const repo = await getRepositoryForRequest();
-  const [stats, campaigns] = await Promise.all([repo.getPlatformStats(), repo.listCampaigns({ sort: "recent" })]);
+  const stats = repo.getPlatformStats();
+  const campaigns = repo.listCampaigns({ sort: "recent" });
 
   const featured = [
     ...campaigns.filter((c) => c.featured),
@@ -85,11 +86,18 @@ export default async function HomePage() {
               View all campaigns <ArrowRight className="size-4" />
             </ButtonLink>
           </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {featured.map((c) => (
-              <CampaignCard key={c.id} campaign={c} />
-            ))}
-          </div>
+          {featured.length ? (
+            <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {featured.map((c) => (
+                <CampaignCard key={c.id} campaign={c} />
+              ))}
+            </div>
+          ) : (
+            <div className="surface mt-10 px-6 py-12 text-center">
+              <p className="text-base font-semibold">The first campaigns are being screened.</p>
+              <p className="mt-2 text-sm text-fg-muted">Approved projects will appear here with their screening reports and reward allocations.</p>
+            </div>
+          )}
         </Container>
       </section>
 

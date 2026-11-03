@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { ApplicationStatusBadge } from "@/components/campaign/StatusBadges";
 import { Container, PageHeader } from "@/components/layout/PageHeader";
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { PayWithWallet } from "@/components/wallet/PayWithWallet";
+import { Badge } from "@/components/ui/Badge";
+import { getPublicConfig } from "@/lib/config";
 import { getRepositoryForRequest } from "@/lib/data";
 import { CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
 import { formatDateTime } from "@/lib/format";
@@ -22,7 +25,8 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
   const { ref } = await searchParams;
   const parsed = ref ? referenceSchema.safeParse(ref) : null;
   const repo = await getRepositoryForRequest();
-  const result = parsed?.success ? await repo.getApplicationStatus(parsed.data) : null;
+  const result = parsed?.success ? repo.getApplicationStatus(parsed.data) : null;
+  const cfg = getPublicConfig();
   const stage = result ? (result.status === "submitted" ? 0 : result.status === "under_review" ? 1 : 2) : -1;
 
   return (
@@ -61,8 +65,40 @@ export default async function StatusPage({ searchParams }: { searchParams: Promi
                 {CAMPAIGN_PACKAGES[result.campaignPackage].name} package · Submitted {formatDateTime(result.createdAt)}
               </p>
             </div>
-            <ApplicationStatusBadge status={result.status} />
+            <div className="flex flex-col items-end gap-1.5">
+              <ApplicationStatusBadge status={result.status} />
+              {result.paymentStatus === "paid" ? (
+                <Badge tone="volt">Fee paid · verified</Badge>
+              ) : result.paymentStatus === "awaiting_payment" ? (
+                <Badge tone="violet">Awaiting payment</Badge>
+              ) : (
+                <Badge tone="amber">TEST MODE payment</Badge>
+              )}
+            </div>
           </div>
+
+          {result.paymentStatus === "awaiting_payment" && cfg.paymentsLive && (
+            <div className="mt-6">
+              <PayWithWallet
+                reference={result.reference}
+                amountUsd={(CAMPAIGN_PACKAGES[result.campaignPackage].feeUsdCents / 100).toFixed(2)}
+                cluster={cfg.cluster}
+              />
+            </div>
+          )}
+          {result.paymentSignature && (
+            <p className="mt-4 break-all font-mono text-xs text-fg-subtle">
+              Payment tx:{" "}
+              <a
+                className="text-violet-300 hover:underline"
+                href={`https://solscan.io/tx/${result.paymentSignature}${cfg.cluster === "devnet" ? "?cluster=devnet" : ""}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {result.paymentSignature}
+              </a>
+            </p>
+          )}
 
           <ol className="mt-8 space-y-0">
             {TIMELINE.map((t, i) => {

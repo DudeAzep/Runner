@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { Logo } from "@/components/brand/Logo";
 import { Badge } from "@/components/ui/Badge";
+import { SolanaWalletProvider } from "@/components/wallet/SolanaWalletProvider";
 import { requireAdminPage } from "@/lib/auth/admin";
 import { logoutAction } from "../login/actions";
 
@@ -32,7 +33,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="mt-4 hidden space-y-3 border-t border-ink-700 pt-4 lg:absolute lg:inset-x-5 lg:bottom-5 lg:block">
           <div className="text-xs text-fg-subtle">
             Signed in as <span className="text-fg-muted">{session.label}</span>
-            <div className="mt-0.5">{session.mode === "demo" ? "Demo store (in-memory)" : "Supabase"}</div>
+            <div className="mt-0.5">Local database</div>
           </div>
           <Link href="/" className="flex items-center gap-2 text-sm text-fg-muted hover:text-fg">
             <ExternalLink className="size-4" /> View site
@@ -53,7 +54,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </button>
           </form>
         </div>
-        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
+          <SolanaWalletProvider>{children}</SolanaWalletProvider>
+        </main>
       </div>
     </div>
   );

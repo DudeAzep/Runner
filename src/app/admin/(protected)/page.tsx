@@ -5,13 +5,17 @@ import { Badge } from "@/components/ui/Badge";
 import { StatisticsCard } from "@/components/ui/StatisticsCard";
 import { adminRepository } from "@/lib/auth/admin-data";
 import { CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
+import { getConfig } from "@/lib/config";
 import { formatDate, formatInt, formatUsdCents } from "@/lib/format";
 
 export const metadata = { title: "Overview" };
 
 export default async function AdminOverviewPage() {
   const { repo } = await adminRepository();
-  const [o, apps] = await Promise.all([repo.getAdminOverview(), repo.listApplications({ status: "all" })]);
+  const o = repo.getAdminOverview();
+  const apps = repo.listApplications({ status: "all" });
+  const verifiedRevenue = repo.getVerifiedRevenueCents();
+  const cfg = getConfig();
   const queue = apps.filter((a) => a.status === "submitted" || a.status === "under_review").slice(0, 6);
 
   return (
@@ -21,7 +25,11 @@ export default async function AdminOverviewPage() {
           <p className="label text-violet-400">Admin</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Overview</h1>
         </div>
-        <Badge tone="amber">Revenue figures are simulated (TEST MODE)</Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={cfg.paymentsLive ? "volt" : "amber"}>Payments {cfg.paymentsLive ? "LIVE" : "TEST MODE"}</Badge>
+          <Badge tone={cfg.treasuryLive ? "volt" : "amber"}>Treasury {cfg.treasuryLive ? "LIVE" : "SIMULATED"}</Badge>
+          {cfg.cluster === "devnet" && <Badge tone="amber">DEVNET</Badge>}
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-3">
@@ -29,9 +37,14 @@ export default async function AdminOverviewPage() {
         <StatisticsCard label="Pending applications" value={formatInt(o.pendingApplications)} icon={Clock} hint="Submitted + under review" />
         <StatisticsCard label="Approved campaigns" value={formatInt(o.approvedCampaigns)} icon={Layers} accent="volt" />
         <StatisticsCard label="Rejected applications" value={formatInt(o.rejectedApplications)} icon={Ban} accent="neutral" />
-        <StatisticsCard label="Simulated campaign revenue" value={formatUsdCents(o.simulatedRevenueCents)} icon={CircleDollarSign} hint="Approved, non-cancelled campaigns" />
         <StatisticsCard
-          label="Simulated token purchase allocation"
+          label="Campaign revenue (booked)"
+          value={formatUsdCents(o.simulatedRevenueCents)}
+          icon={CircleDollarSign}
+          hint={`Approved campaigns · ${formatUsdCents(verifiedRevenue)} verified USDC received on-chain`}
+        />
+        <StatisticsCard
+          label="Token purchase allocation (70%)"
           value={formatUsdCents(o.simulatedRewardAllocationCents)}
           icon={Landmark}
           accent="volt"

@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Logo } from "@/components/brand/Logo";
 import { getAdminSession } from "@/lib/auth/admin";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = { title: "Admin sign in", robots: { index: false, follow: false } };
@@ -13,7 +12,6 @@ export const metadata: Metadata = { title: "Admin sign in", robots: { index: fal
 export default async function AdminLoginPage() {
   await connection();
   if (await getAdminSession()) redirect("/admin");
-  const mode = isSupabaseConfigured() ? "supabase" : "demo";
   return (
     <div className="relative flex min-h-dvh items-center justify-center px-4">
       <div aria-hidden className="grid-bg absolute inset-0" />
@@ -26,12 +24,11 @@ export default async function AdminLoginPage() {
           <h1 className="text-lg font-semibold">Admin sign in</h1>
         </div>
         <p className="mt-1.5 text-sm text-fg-muted">
-          {mode === "supabase"
-            ? "Sign in with your Supabase account. Your user must have the admin role."
-            : "Demo mode: credentials are set via server environment variables."}
+          Use the username and password from your <code className="font-mono text-xs">.env.local</code> file (created by{" "}
+          <code className="font-mono text-xs">npm run setup</code>).
         </p>
         <div className="mt-6">
-          <LoginForm mode={mode} />
+          <LoginForm />
         </div>
       </div>
     </div>

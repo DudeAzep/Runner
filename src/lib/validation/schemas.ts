@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { PACKAGE_IDS } from "@/lib/economics/allocation";
-import { CAMPAIGN_STATUSES, RISK_LEVELS } from "@/lib/types";
+import { CAMPAIGN_STATUSES, RISK_LEVELS, type CampaignStatus, type RiskLevel } from "@/lib/types";
 import { isValidSolanaAddress } from "./solana";
 
 const solanaAddress = (label: string) =>
@@ -76,23 +76,19 @@ export const screeningSchema = z.object({
   riskFlags: z.array(z.string().max(80)).max(20),
   screeningNotes: z.string().trim().max(5000),
   recommendation: z.enum(["approve", "reject", "needs_info"]),
-  riskLevel: z.enum(RISK_LEVELS as [string, ...string[]]),
+  riskLevel: z.enum(RISK_LEVELS as [RiskLevel, ...RiskLevel[]]),
 });
 
 export type ScreeningInput = z.infer<typeof screeningSchema>;
 
 export const campaignUpdateSchema = z.object({
   description: z.string().trim().min(10).max(2000),
-  status: z.enum(CAMPAIGN_STATUSES as [string, ...string[]]),
-  riskLevel: z.enum(RISK_LEVELS as [string, ...string[]]),
+  status: z.enum(CAMPAIGN_STATUSES as [CampaignStatus, ...CampaignStatus[]]),
+  riskLevel: z.enum(RISK_LEVELS as [RiskLevel, ...RiskLevel[]]),
   featured: z.boolean(),
   snapshotAt: z.preprocess(
     (v) => (v === "" || v == null ? null : v),
     z.string().refine((s) => !Number.isNaN(Date.parse(s)), "Invalid date").nullable(),
-  ),
-  eligibleSupply: z.preprocess(
-    (v) => (v === "" || v == null ? null : v),
-    z.string().regex(/^\d{1,18}$/, "Eligible supply must be a whole number").nullable(),
   ),
 });
 
@@ -106,12 +102,26 @@ export const purchaseSchema = z.object({
 
 export type PurchaseInput = z.infer<typeof purchaseSchema>;
 
-export const distributionSchema = z.object({
-  walletAddress: solanaAddress("Wallet address"),
-  runnerBalance: z.string().trim().regex(/^\d{1,18}$/, "RUNNER balance must be a whole number"),
-});
-
-export type DistributionInput = z.infer<typeof distributionSchema>;
+/**
+ * Parses a holder snapshot CSV: one "wallet,balance" per line (header optional).
+ * Balances are whole RUNNER tokens or decimals; they are converted to base units.
+ */
+export function parseSnapshotCsv(text: string, decimals: number): { holders: { wallet: string; balance: string }[]; errors: string[] } {
+  const errors: string[] = [];
+  const byWallet = new Map<string, bigint>();
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  lines.forEach((line, i) => {
+    const [walletRaw, balRaw] = line.split(/[,;\t]/).map((x) => x?.trim().replace(/^"|"$/g, "") ?? "");
+    if (i === 0 && walletRaw && !isValidSolanaAddress(walletRaw) && !/^\d/.test(balRaw ?? "")) return; // header
+    if (!walletRaw || !isValidSolanaAddress(walletRaw)) return void errors.push(`Line ${i + 1}: invalid wallet address`);
+    const bal = (balRaw ?? "").replace(/[_\s]/g, "").replace(/,/g, "");
+    if (!/^\d+(\.\d+)?$/.test(bal)) return void errors.push(`Line ${i + 1}: invalid balance`);
+    const [w, f = ""] = bal.split(".");
+    const raw = BigInt(w!) * 10n ** BigInt(decimals) + BigInt((f + "0".repeat(decimals)).slice(0, decimals) || "0");
+    byWallet.set(walletRaw, (byWallet.get(walletRaw) ?? 0n) + raw);
+  });
+  return { holders: [...byWallet].map(([wallet, b]) => ({ wallet, balance: b.toString() })), errors: errors.slice(0, 20) };
+}
 
 export const referenceSchema = z
   .string()

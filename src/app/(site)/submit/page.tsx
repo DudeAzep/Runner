@@ -1,12 +1,16 @@
 import { ShieldAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { Container, PageHeader } from "@/components/layout/PageHeader";
+import { getPublicConfig } from "@/lib/config";
 import { SubmitForm } from "./SubmitForm";
 
 export const metadata: Metadata = { title: "Submit a Project" };
 
-export default function SubmitPage() {
+export default async function SubmitPage() {
+  await connection(); // read settings at request time, not build time
+  const cfg = getPublicConfig();
   return (
     <Container className="max-w-4xl">
       <PageHeader
@@ -32,7 +36,7 @@ export default function SubmitPage() {
         </div>
       </div>
 
-      <SubmitForm />
+      <SubmitForm paymentsLive={cfg.paymentsLive} cluster={cfg.cluster} />
     </Container>
   );
 }

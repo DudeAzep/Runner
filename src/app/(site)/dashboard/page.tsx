@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Container, PageHeader } from "@/components/layout/PageHeader";
+import { getPublicConfig } from "@/lib/config";
 import { getRepositoryForRequest } from "@/lib/data";
 import { DEMO_ELIGIBLE_SUPPLY, DEMO_RUNNER_BALANCE, DEMO_WALLET } from "@/lib/data/demo-seed";
 import { HolderDashboard, type DashboardCampaign } from "./HolderDashboard";
@@ -9,7 +10,8 @@ export const metadata: Metadata = { title: "Holder Dashboard" };
 
 export default async function DashboardPage() {
   const repo = await getRepositoryForRequest();
-  const [campaigns, demoDist] = await Promise.all([repo.listCampaigns(), fetchWalletDistributions(DEMO_WALLET)]);
+  const campaigns = repo.listCampaigns();
+  const demoDist = await fetchWalletDistributions(DEMO_WALLET);
 
   const eligible: DashboardCampaign[] = campaigns
     .filter((c) => c.status === "active" || c.status === "upcoming")
@@ -35,6 +37,7 @@ export default async function DashboardPage() {
         description="Track eligible campaigns, estimate proportional rewards, and review distribution history for your wallet."
       />
       <HolderDashboard
+        cluster={getPublicConfig().cluster}
         eligibleCampaigns={eligible}
         demo={{
           wallet: DEMO_WALLET,

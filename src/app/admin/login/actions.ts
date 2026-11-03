@@ -3,8 +3,6 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ADMIN_COOKIE, ADMIN_SESSION_TTL_SECONDS, getSessionSecret, safeEqual, signAdminToken } from "@/lib/auth/session-token";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createSupabaseSessionClient } from "@/lib/supabase/server";
 
 export interface LoginState {
   error?: string;
@@ -42,28 +40,12 @@ export async function loginAction(_prev: LoginState, fd: FormData): Promise<Logi
   const password = String(fd.get("password") ?? "");
   if (!email || !password) return { error: "Enter your credentials." };
 
-  if (isSupabaseConfigured()) {
-    const supabase = await createSupabaseSessionClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error || !data.user) {
-      recordFailure(key);
-      return { error: "Invalid credentials." };
-    }
-    const { data: row } = await supabase.from("users").select("role").eq("auth_user_id", data.user.id).maybeSingle();
-    if (row?.role !== "admin") {
-      await supabase.auth.signOut();
-      recordFailure(key);
-      return { error: "This account is not authorized for admin access." };
-    }
-    redirect("/admin");
-  }
-
-  // Demo mode: credentials come from server-only environment variables.
+  // Credentials come from server-only environment variables (.env.local).
   const expectedUser = process.env.ADMIN_USERNAME || "admin";
   const expectedPass = process.env.ADMIN_PASSWORD;
   const secret = getSessionSecret();
   if (!expectedPass || expectedPass.length < 12 || !secret) {
-    return { error: "Admin access is not configured. Set ADMIN_PASSWORD (12+ chars) and ADMIN_SESSION_SECRET (32+ chars) on the server." };
+    return { error: "Admin access is not configured. Run `npm run setup` (or set ADMIN_PASSWORD and ADMIN_SESSION_SECRET in .env.local) and restart." };
   }
   const ok = (await safeEqual(email, expectedUser)) && (await safeEqual(password, expectedPass));
   if (!ok) {
@@ -83,10 +65,6 @@ export async function loginAction(_prev: LoginState, fd: FormData): Promise<Logi
 }
 
 export async function logoutAction() {
-  if (isSupabaseConfigured()) {
-    const supabase = await createSupabaseSessionClient();
-    await supabase.auth.signOut();
-  }
   (await cookies()).delete({ name: ADMIN_COOKIE, path: "/admin" });
   redirect("/admin/login");
 }

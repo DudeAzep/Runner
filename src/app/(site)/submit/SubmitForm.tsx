@@ -4,6 +4,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { CheckCircle2, CircleCheck, Copy, CreditCard, FlaskConical, LoaderCircle, ShieldAlert } from "lucide-react";
 import { useActionState, useState, type ReactNode } from "react";
 import { ApplicationStatusBadge } from "@/components/campaign/StatusBadges";
+import { PayWithWallet } from "@/components/wallet/PayWithWallet";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
@@ -61,12 +62,17 @@ function Section({ step, title, children }: { step: number; title: string; child
   );
 }
 
-export function SubmitForm() {
-  const [formKey, setFormKey] = useState(0);
-  return <SubmitFormInner key={formKey} onReset={() => setFormKey((k) => k + 1)} />;
+interface PaymentConfig {
+  paymentsLive: boolean;
+  cluster: "mainnet-beta" | "devnet";
 }
 
-function SubmitFormInner({ onReset }: { onReset: () => void }) {
+export function SubmitForm(props: PaymentConfig) {
+  const [formKey, setFormKey] = useState(0);
+  return <SubmitFormInner key={formKey} onReset={() => setFormKey((k) => k + 1)} {...props} />;
+}
+
+function SubmitFormInner({ onReset, paymentsLive, cluster }: { onReset: () => void } & PaymentConfig) {
   const [state, action, pending] = useActionState<SubmitState, FormData>(submitApplication, { status: "idle" });
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [pkg, setPkg] = useState<CampaignPackageId>("growth");
@@ -74,7 +80,7 @@ function SubmitFormInner({ onReset }: { onReset: () => void }) {
   const [paying, setPaying] = useState(false);
   const { publicKey } = useWallet();
 
-  if (state.status === "success") return <Confirmation state={state} onReset={onReset} />;
+  if (state.status === "success") return <Confirmation state={state} onReset={onReset} cluster={cluster} />;
 
   const values = state.status === "error" ? state.values : {};
   const serverErrors = state.status === "error" ? state.fieldErrors : {};
@@ -232,7 +238,19 @@ function SubmitFormInner({ onReset }: { onReset: () => void }) {
         </div>
       </Section>
 
-      {/* TEST MODE payment */}
+      {paymentsLive ? (
+        <div className="rounded-lg border border-violet-500/40 bg-violet-500/[0.06] p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <CreditCard className="size-4 text-violet-300" aria-hidden />
+            <h2 className="text-[15px] font-semibold">Campaign fee payment · {formatUsdCents(alloc.totalUsdCents)} USDC</h2>
+            {cluster === "devnet" && <Badge tone="amber">DEVNET</Badge>}
+          </div>
+          <p className="mt-3 text-sm text-fg-muted">
+            After you submit, you&apos;ll pay the fee in USDC from your Solana wallet. The payment is verified on-chain before screening
+            begins. If approved, {formatUsdCents(alloc.rewardUsdCents)} (70%) is used to buy your token for RUNNER holders.
+          </p>
+        </div>
+      ) : (
       <fieldset className="relative overflow-hidden rounded-lg border border-dashed border-amber-400/40 bg-amber-400/[0.03] p-5 sm:p-6">
         <legend className="sr-only">Simulated payment</legend>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -283,6 +301,7 @@ function SubmitFormInner({ onReset }: { onReset: () => void }) {
         <input type="hidden" name="testPaymentConfirmed" value={paid ? "yes" : ""} />
         {serverErrors.payment && !paid && <p className="mt-3 text-xs text-rose-400">{serverErrors.payment}</p>}
       </fieldset>
+      )}
 
       <div className="surface p-5 sm:p-6">
         <label className="flex items-start gap-3 text-sm text-fg-muted">
@@ -295,18 +314,27 @@ function SubmitFormInner({ onReset }: { onReset: () => void }) {
         {err("acceptTerms") && <p className="mt-2 text-xs text-rose-400">{err("acceptTerms")}</p>}
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-fg-subtle">Fields marked * are required.</p>
-          <Button type="submit" size="lg" disabled={pending || !paid}>
+          <Button type="submit" size="lg" disabled={pending || (!paymentsLive && !paid)}>
             {pending && <LoaderCircle className="size-4 animate-spin" />}
             {pending ? "Submitting…" : "Submit application"}
           </Button>
         </div>
-        {!paid && <p className="mt-3 text-right text-xs text-amber-400">Complete the TEST MODE payment step to enable submission.</p>}
+        {!paymentsLive && !paid && <p className="mt-3 text-right text-xs text-amber-400">Complete the TEST MODE payment step to enable submission.</p>}
       </div>
     </form>
   );
 }
 
-function Confirmation({ state, onReset }: { state: Extract<SubmitState, { status: "success" }>; onReset: () => void }) {
+function Confirmation({
+  state,
+  onReset,
+  cluster,
+}: {
+  state: Extract<SubmitState, { status: "success" }>;
+  onReset: () => void;
+  cluster: "mainnet-beta" | "devnet";
+}) {
+  const awaiting = state.paymentStatus === "awaiting_payment";
   const [copied, setCopied] = useState(false);
   return (
     <div className="surface animate-fade-up p-6 sm:p-10" role="status">
@@ -345,10 +373,17 @@ function Confirmation({ state, onReset }: { state: Extract<SubmitState, { status
         <div className="rounded-md border border-ink-600 bg-ink-900 p-4">
           <div className="label">Package · Payment</div>
           <div className="mt-2 text-sm">
-            {CAMPAIGN_PACKAGES[state.campaignPackage].name} · <span className="text-amber-400">TEST MODE (simulated)</span>
+            {CAMPAIGN_PACKAGES[state.campaignPackage].name} ·{" "}
+            {awaiting ? <span className="text-violet-300">Awaiting payment</span> : <span className="text-amber-400">TEST MODE (simulated)</span>}
           </div>
         </div>
       </div>
+
+      {awaiting && (
+        <div className="mt-6">
+          <PayWithWallet reference={state.reference} amountUsd={(CAMPAIGN_PACKAGES[state.campaignPackage].feeUsdCents / 100).toFixed(2)} cluster={cluster} />
+        </div>
+      )}
 
       <div className="mt-6 flex items-start gap-3 rounded-md border border-ink-700 bg-ink-900/60 p-4 text-sm text-fg-muted">
         <ShieldAlert className="mt-0.5 size-4 shrink-0 text-violet-400" />

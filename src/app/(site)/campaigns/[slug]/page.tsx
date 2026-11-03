@@ -11,7 +11,9 @@ import { CampaignStatusBadge, RiskBadge, ScreeningStatusBadge } from "@/componen
 import { Container } from "@/components/layout/PageHeader";
 import { AddressChip } from "@/components/ui/AddressChip";
 import { Badge, SourceBadge } from "@/components/ui/Badge";
+import { getPublicConfig } from "@/lib/config";
 import { getRepositoryForRequest } from "@/lib/data";
+import { fromBaseUnits } from "@/lib/economics/rewards";
 import { CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
 import { formatDate, formatDateTime, formatInt, formatUsdCents, formatUsdCompact } from "@/lib/format";
 
@@ -51,7 +53,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
   const repo = await getRepositoryForRequest();
   const detail = await repo.getCampaignDetail(slug);
   if (!detail) notFound();
-  const { campaign: c, screening, purchases, distributionSummary } = detail;
+  const { campaign: c, screening, purchases, snapshot, distributionSummary } = detail;
+  const cluster = getPublicConfig().cluster;
+  const txUrl = (sig: string) => `https://solscan.io/tx/${sig}${cluster === "devnet" ? "?cluster=devnet" : ""}`;
   const pkg = CAMPAIGN_PACKAGES[c.campaignPackage];
   const spentCents = purchases.reduce((s, p) => s + p.usdcSpentCents, 0);
 
@@ -162,7 +166,13 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
                       {formatUsdCents(p.usdcSpentCents)} USDC · {formatDateTime(p.executedAt)}
                     </div>
                     <div className="mt-1 text-xs text-fg-subtle">
-                      {p.transactionSignature ? `Signature: ${p.transactionSignature}` : "No on-chain transaction (simulated record)."}
+                      {p.transactionSignature ? (
+                        <a href={txUrl(p.transactionSignature)} target="_blank" rel="noopener noreferrer" className="break-all font-mono text-violet-300 hover:underline">
+                          View transaction ↗
+                        </a>
+                      ) : (
+                        "No on-chain transaction (simulated record)."
+                      )}
                     </div>
                   </li>
                 ))}
@@ -180,16 +190,32 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
                   {c.snapshotAt ? formatDateTime(c.snapshotAt) : "To be announced"}
                 </span>
               </Row>
-              <Row label="Eligible RUNNER supply">{c.eligibleSupply ? formatInt(BigInt(c.eligibleSupply)) : "Set at snapshot"}</Row>
-              <Row label="Recipients recorded">{formatInt(distributionSummary.recipientCount)}</Row>
+              <Row label="Snapshot status">
+                {snapshot ? (
+                  <span className="inline-flex items-center gap-2">
+                    Taken{snapshot.slot ? ` · slot ${snapshot.slot}` : ""} <SourceBadge source={snapshot.source} />
+                  </span>
+                ) : (
+                  "Not taken yet"
+                )}
+              </Row>
+              <Row label="Eligible RUNNER supply">{c.eligibleSupply ? fromBaseUnits(BigInt(c.eligibleSupply), c.runnerDecimals, 2) : "Set at snapshot"}</Row>
+              <Row label="Eligible holders">{snapshot ? formatInt(snapshot.holderCount) : "—"}</Row>
+              <Row label="Recipients">{formatInt(distributionSummary.recipientCount)}</Row>
               <Row label="Tokens distributed">
                 {distributionSummary.recipientCount ? `${distributionSummary.totalRewardTokens} ${c.ticker}` : "—"}
               </Row>
               <Row label="Status">
                 {distributionSummary.status === "not_started" ? (
                   <Badge>Not started</Badge>
+                ) : distributionSummary.status === "planned" ? (
+                  <Badge tone="violet">Planned</Badge>
+                ) : distributionSummary.status === "in_progress" ? (
+                  <Badge tone="sky">
+                    In progress · {distributionSummary.confirmedCount}/{distributionSummary.recipientCount}
+                  </Badge>
                 ) : distributionSummary.status === "verified" ? (
-                  <Badge tone="volt">Verified</Badge>
+                  <Badge tone="volt">Verified on-chain</Badge>
                 ) : (
                   <Badge tone="amber">SIMULATED</Badge>
                 )}

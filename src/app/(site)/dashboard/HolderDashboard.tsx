@@ -26,7 +26,7 @@ import { WalletConnectButton } from "@/components/wallet/WalletConnectButton";
 import { estimateUsdReward } from "@/lib/economics/rewards";
 import { formatDate, formatDateTime, formatInt, formatPercent, formatUsdCents } from "@/lib/format";
 import type { CampaignStatus, DataSource } from "@/lib/types";
-import { fetchWalletDistributions, type WalletDistributionItem } from "./actions";
+import { fetchRunnerBalance, fetchWalletDistributions, type WalletDistributionItem } from "./actions";
 
 export interface DashboardCampaign {
   slug: string;
@@ -72,7 +72,17 @@ function Empty({ children }: { children: ReactNode }) {
   );
 }
 
-export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns: DashboardCampaign[]; demo: DemoBundle }) {
+type RunnerBal = Awaited<ReturnType<typeof fetchRunnerBalance>>;
+
+export function HolderDashboard({
+  eligibleCampaigns,
+  demo,
+  cluster,
+}: {
+  eligibleCampaigns: DashboardCampaign[];
+  demo: DemoBundle;
+  cluster: "mainnet-beta" | "devnet";
+}) {
   const { publicKey, wallet, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
   const [demoMode, setDemoMode] = useState(false);
@@ -82,7 +92,9 @@ export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns
   const connectedAddress = publicKey?.toBase58() ?? null;
   const mode: Mode = demoMode ? "demo" : connectedAddress ? "connected" : "none";
 
+  const [runnerBal, setRunnerBal] = useState<{ address: string; value: RunnerBal } | null>(null);
   const liveDistributions = connectedAddress && live?.address === connectedAddress ? live.items : null;
+  const liveBal = connectedAddress && runnerBal?.address === connectedAddress ? runnerBal.value : null;
 
   useEffect(() => {
     if (!connectedAddress) return;
@@ -90,27 +102,33 @@ export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns
     fetchWalletDistributions(connectedAddress).then((r) => {
       if (!cancelled) setLive({ address: connectedAddress, items: r.items });
     });
+    fetchRunnerBalance(connectedAddress).then((value) => {
+      if (!cancelled) setRunnerBal({ address: connectedAddress, value });
+    });
     return () => {
       cancelled = true;
     };
   }, [connectedAddress]);
 
   const address = mode === "demo" ? demo.wallet : connectedAddress;
-  const balance = mode === "demo" ? demo.runnerBalance : null; // live balance lookup not enabled in MVP
+  const liveBalance = liveBal && liveBal.configured && liveBal.ok ? liveBal : null;
+  const balance = mode === "demo" ? demo.runnerBalance : liveBalance ? liveBalance.balance : null;
+  // Estimates use the demo eligible supply, or the live total supply (a conservative upper bound).
+  const supply = mode === "connected" && liveBalance ? Math.max(1, Math.floor(liveBalance.supply)) : demo.eligibleSupply;
   const distributions = mode === "demo" ? demo.distributions : (liveDistributions ?? []);
 
   const estimateBalance = useMemo(() => {
     const raw = estimateInput.replace(/[,_\s]/g, "");
-    if (/^\d{1,15}$/.test(raw)) return Math.min(Number(raw), demo.eligibleSupply);
-    return balance ?? 0;
-  }, [estimateInput, balance, demo.eligibleSupply]);
+    if (/^\d{1,15}$/.test(raw)) return Math.min(Number(raw), supply);
+    return Math.floor(balance ?? 0);
+  }, [estimateInput, balance, supply]);
 
   const estimates = eligibleCampaigns.map((c) => ({
     ...c,
-    est: estimateUsdReward(BigInt(estimateBalance), BigInt(demo.eligibleSupply), c.rewardAllocationCents),
+    est: estimateUsdReward(BigInt(estimateBalance), BigInt(supply), c.rewardAllocationCents),
   }));
   const totalEstimateCents = estimates.reduce((s, e) => s + e.est.rewardUsdCents, 0);
-  const share = estimateBalance > 0 ? (estimateBalance / demo.eligibleSupply) * 100 : 0;
+  const share = estimateBalance > 0 ? (estimateBalance / supply) * 100 : 0;
 
   if (mode === "none") {
     return (
@@ -163,8 +181,11 @@ export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns
       ) : (
         <div className="flex flex-col gap-3 rounded-md border border-violet-500/30 bg-violet-500/[0.06] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
           <p className="text-fg-muted">
-            Live RUNNER balance lookup is not enabled in this MVP. Only distributions recorded for your address are shown — nothing is
-            assumed.
+            {liveBal && liveBal.configured
+              ? liveBal.ok
+                ? "Your RUNNER balance is read live from Solana. Rewards shown below are only those recorded for your address."
+                : `Couldn't read your RUNNER balance: ${liveBal.error}`
+              : "The RUNNER token isn't live yet, so balances can't be read. Only distributions recorded for your address are shown — nothing is assumed."}
           </p>
           <Button variant="secondary" size="sm" onClick={() => setDemoMode(true)}>
             <FlaskConical className="size-4 text-amber-400" /> View demo wallet
@@ -199,12 +220,15 @@ export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns
           {balance != null ? (
             <>
               <div className="tabular text-2xl font-semibold tracking-tight">{formatInt(balance)}</div>
-              <div className="mt-1 text-xs text-fg-subtle">{formatPercent((balance / demo.eligibleSupply) * 100)} of eligible supply</div>
+              <div className="mt-1 text-xs text-fg-subtle">
+                {formatPercent((balance / supply) * 100)} of {mode === "demo" ? "eligible" : "total"} supply
+                {mode === "connected" && " · live from Solana"}
+              </div>
             </>
           ) : (
             <>
               <div className="text-2xl font-semibold tracking-tight text-fg-subtle">—</div>
-              <div className="mt-1 text-xs text-fg-subtle">Unverified · on-chain lookup coming soon</div>
+              <div className="mt-1 text-xs text-fg-subtle">{liveBal === null ? "Loading…" : "Not available"}</div>
             </>
           )}
         </Card>
@@ -258,7 +282,8 @@ export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns
             <Empty>No campaigns are currently open for eligibility.</Empty>
           )}
           <p className="mt-4 text-xs leading-relaxed text-fg-subtle">
-            Estimates use the formula balance ÷ eligible supply × pool, assuming {formatInt(demo.eligibleSupply)} eligible RUNNER (illustrative).
+            Estimates use the formula balance ÷ eligible supply × pool, assuming {formatInt(supply)} eligible RUNNER
+            {mode === "connected" && liveBalance ? " (total supply — your real share is usually higher after exclusions)" : " (illustrative)"}.
             Actual rewards depend on the published snapshot and are paid in the project token, whose value can change.
           </p>
         </Card>
@@ -320,13 +345,21 @@ export function HolderDashboard({ eligibleCampaigns, demo }: { eligibleCampaigns
                         {d.projectName}
                       </Link>
                     </td>
-                    <td>{formatInt(BigInt(d.runnerBalance))}</td>
+                    <td>{d.runnerBalance}</td>
                     <td>{formatPercent(d.rewardPercentage)}</td>
                     <td className="text-right">
                       {Number(d.rewardAmount).toLocaleString("en-US", { maximumFractionDigits: 2 })} {d.ticker}
                     </td>
                     <td className="pl-6">
-                      {d.status === "confirmed" ? <Badge tone="volt">Confirmed</Badge> : <Badge tone="amber">SIMULATED</Badge>}
+                      {d.status === "confirmed" && d.signature ? (
+                        <a href={`https://solscan.io/tx/${d.signature}${cluster === "devnet" ? "?cluster=devnet" : ""}`} target="_blank" rel="noopener noreferrer">
+                          <Badge tone="volt">Confirmed ↗</Badge>
+                        </a>
+                      ) : d.status === "simulated" ? (
+                        <Badge tone="amber">SIMULATED</Badge>
+                      ) : (
+                        <Badge tone="sky">Pending</Badge>
+                      )}
                     </td>
                     <td className="px-5 text-fg-muted">{formatDate(d.createdAt)}</td>
                   </tr>

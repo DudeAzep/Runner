@@ -11,7 +11,7 @@
  */
 import { calculateCampaignAllocation, CAMPAIGN_PACKAGES, type CampaignPackageId } from "@/lib/economics/allocation";
 import { calculateHolderReward, fromBaseUnits, toBaseUnits } from "@/lib/economics/rewards";
-import type { Application, Campaign, Distribution, Screening, TreasuryPurchase } from "@/lib/types";
+import type { Application, Campaign, Distribution, Screening, Snapshot, SnapshotHolders, TokenReport, TreasuryPurchase } from "@/lib/types";
 
 export const DEMO_WALLET = "DbF5KSt39LEiJEf2uZZTwzcNvxzVxUABHXHSuK6ZSghx";
 export const DEMO_RUNNER_BALANCE = 250_000;
@@ -200,7 +200,7 @@ const PROJECTS: SeedProject[] = [
   },
 ];
 
-const PENDING_APPLICATIONS: Omit<Application, "id" | "updatedAt" | "source" | "paymentStatus">[] = [
+const PENDING_APPLICATIONS: Omit<Application, "id" | "updatedAt" | "source" | "paymentStatus" | "paymentSignature" | "paymentPayer" | "paidAt">[] = [
   {
     reference: "RUN-7Q4K2M",
     projectName: "Lumen Otter",
@@ -268,6 +268,10 @@ export interface DemoSeed {
   campaigns: Campaign[];
   purchases: TreasuryPurchase[];
   distributions: Distribution[];
+  snapshots: Snapshot[];
+  snapshotHolders: SnapshotHolders[];
+  tokenReports: TokenReport[];
+  usedSignatures: { id: string; usedFor: string; at: string }[];
 }
 
 /** Token amounts the simulated treasury "bought" for completed/active demo campaigns. */
@@ -283,6 +287,8 @@ export function createDemoSeed(): DemoSeed {
   const campaigns: Campaign[] = [];
   const purchases: TreasuryPurchase[] = [];
   const distributions: Distribution[] = [];
+  const snapshots: Snapshot[] = [];
+  const snapshotHolders: SnapshotHolders[] = [];
 
   PROJECTS.forEach((p, i) => {
     const appId = `demo-app-${p.slug}`;
@@ -298,6 +304,9 @@ export function createDemoSeed(): DemoSeed {
       campaignPackage: p.pkg,
       status: p.applicationStatus,
       paymentStatus: "test_mode_simulated",
+      paymentSignature: null,
+      paymentPayer: null,
+      paidAt: null,
       createdAt: p.submitted,
       updatedAt: p.screened,
       source: "demo",
@@ -354,7 +363,10 @@ export function createDemoSeed(): DemoSeed {
       liquidityAtScreeningUsd: p.liq,
       holderCountAtScreening: p.holders,
       snapshotAt: p.campaign.snapshotAt,
+      snapshotId: p.campaign.status === "completed" ? `demo-snap-${p.slug}` : null,
       eligibleSupply: p.campaign.status === "completed" ? String(DEMO_ELIGIBLE_SUPPLY) : null,
+      runnerDecimals: 0,
+      rewardDecimals: REWARD_TOKEN_DECIMALS,
       createdAt: p.screened,
       updatedAt: p.screened,
       source: "demo",
@@ -379,19 +391,39 @@ export function createDemoSeed(): DemoSeed {
       const pool = toBaseUnits(purchase.tokenAmount, REWARD_TOKEN_DECIMALS);
       const supply = BigInt(DEMO_ELIGIBLE_SUPPLY);
       const holders = [{ wallet: DEMO_WALLET, balance: DEMO_RUNNER_BALANCE }, ...OTHER_DEMO_HOLDERS];
+      const snapshotId = `demo-snap-${p.slug}`;
+      snapshots.push({
+        id: snapshotId,
+        campaignId,
+        takenAt: p.campaign.snapshotAt ?? p.screened,
+        method: "demo",
+        runnerMint: null,
+        slot: null,
+        runnerDecimals: 0,
+        eligibleSupply: String(DEMO_ELIGIBLE_SUPPLY),
+        holderCount: holders.length,
+        excludedWallets: [],
+        source: "demo",
+      });
+      snapshotHolders.push({ id: snapshotId, holders: holders.map((h) => ({ wallet: h.wallet, balance: String(h.balance) })) });
       holders.forEach((h, j) => {
         const r = calculateHolderReward({ holderBalance: BigInt(h.balance), eligibleSupply: supply, rewardPool: pool });
         distributions.push({
           id: `demo-dist-${p.slug}-${j}`,
           campaignId,
+          snapshotId,
           walletAddress: h.wallet,
           runnerBalance: String(h.balance),
           eligibleSupply: String(DEMO_ELIGIBLE_SUPPLY),
+          runnerDecimals: 0,
           rewardPercentage: r.percentage,
           rewardAmount: fromBaseUnits(r.rewardAmount, REWARD_TOKEN_DECIMALS),
+          rewardAmountRaw: r.rewardAmount.toString(),
+          rewardDecimals: REWARD_TOKEN_DECIMALS,
           distributionStatus: "simulated",
           transactionSignature: null,
           createdAt: purchase.executedAt.replace("18:00", "20:00"),
+          updatedAt: purchase.executedAt.replace("18:00", "20:00"),
           source: "demo",
         });
       });
@@ -403,10 +435,13 @@ export function createDemoSeed(): DemoSeed {
       ...a,
       id: `demo-app-pending-${i}`,
       paymentStatus: "test_mode_simulated",
+      paymentSignature: null,
+      paymentPayer: null,
+      paidAt: null,
       updatedAt: a.createdAt,
       source: "demo",
     });
   });
 
-  return { applications, screenings, campaigns, purchases, distributions };
+  return { applications, screenings, campaigns, purchases, distributions, snapshots, snapshotHolders, tokenReports: [], usedSignatures: [] };
 }

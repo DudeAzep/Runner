@@ -2,8 +2,13 @@ import type { CampaignPackageId } from "@/lib/economics/allocation";
 
 export type { CampaignPackageId };
 
-/** Where a record came from. Only "verified" may be presented as live on-chain data. */
-export type DataSource = "demo" | "verified";
+/**
+ * Where a record came from.
+ * - demo:     fictional sample data shipped with the app
+ * - manual:   real record, but figures were entered by hand / simulated
+ * - verified: backed by on-chain data or a confirmed transaction signature
+ */
+export type DataSource = "demo" | "manual" | "verified";
 
 export type UserRole = "holder" | "project" | "admin";
 
@@ -18,9 +23,16 @@ export const RISK_LEVELS: RiskLevel[] = ["low", "moderate", "elevated", "high"];
 
 export type ScreeningRecommendation = "approve" | "reject" | "needs_info";
 
-export type PaymentStatus = "test_mode_simulated" | "unpaid";
+export type PaymentStatus = "test_mode_simulated" | "awaiting_payment" | "paid";
 
-export type DistributionStatus = "simulated" | "pending" | "confirmed" | "failed";
+/**
+ * planned   → in a distribution plan, not yet sent
+ * submitted → included in a signed transaction that was sent (signature stored)
+ * confirmed → verified on-chain
+ * simulated → marked as sent in TEST MODE (no transaction)
+ * skipped   → below minimum reward
+ */
+export type DistributionStatus = "planned" | "submitted" | "confirmed" | "simulated" | "skipped";
 
 export type PurchaseStatus = "simulated" | "pending" | "confirmed";
 
@@ -42,6 +54,10 @@ export interface Application extends ProjectLinks {
   campaignPackage: CampaignPackageId;
   status: ApplicationStatus;
   paymentStatus: PaymentStatus;
+  /** USDC payment transaction (live mode only). */
+  paymentSignature: string | null;
+  paymentPayer: string | null;
+  paidAt: string | null;
   createdAt: string;
   updatedAt: string;
   source: DataSource;
@@ -127,8 +143,14 @@ export interface Campaign extends ProjectLinks {
   holderCountAtScreening: number | null;
   /** Planned or actual eligibility snapshot time. */
   snapshotAt: string | null;
-  /** Eligible RUNNER supply at the snapshot, in whole tokens (string for bigint safety). */
+  /** Latest eligibility snapshot taken for this campaign. */
+  snapshotId: string | null;
+  /** Eligible RUNNER supply at the snapshot, raw base units (string for bigint safety). */
   eligibleSupply: string | null;
+  /** Decimals of RUNNER balances in the snapshot (0 for demo data). */
+  runnerDecimals: number;
+  /** Decimals of the project (reward) token, once known. */
+  rewardDecimals: number | null;
   createdAt: string;
   updatedAt: string;
   source: DataSource;
@@ -137,6 +159,7 @@ export interface Campaign extends ProjectLinks {
 export interface TreasuryPurchase {
   id: string;
   campaignId: string;
+  /** USDC spent, in cents. */
   usdcSpentCents: number;
   /** Amount of project tokens acquired, decimal string. */
   tokenAmount: string;
@@ -151,17 +174,69 @@ export interface TreasuryPurchase {
 export interface Distribution {
   id: string;
   campaignId: string;
+  snapshotId: string | null;
   walletAddress: string;
+  /** Holder RUNNER balance at snapshot, raw base units. */
   runnerBalance: string;
   eligibleSupply: string;
+  runnerDecimals: number;
   rewardPercentage: number;
-  /** Reward token amount, decimal string. */
+  /** Reward token amount, decimal string (display). */
   rewardAmount: string;
+  /** Reward token amount in base units (what is actually transferred). */
+  rewardAmountRaw: string;
+  rewardDecimals: number;
   distributionStatus: DistributionStatus;
-  /** Only set for verified on-chain transfers. Never fabricated. */
+  /** Only set for real on-chain transfers. Never fabricated. */
   transactionSignature: string | null;
   createdAt: string;
+  updatedAt: string;
   source: DataSource;
+}
+
+export interface Snapshot {
+  id: string;
+  campaignId: string;
+  takenAt: string;
+  method: "rpc" | "csv" | "demo";
+  runnerMint: string | null;
+  slot: number | null;
+  runnerDecimals: number;
+  /** Raw base units. */
+  eligibleSupply: string;
+  holderCount: number;
+  excludedWallets: string[];
+  source: DataSource;
+}
+
+export interface SnapshotHolders {
+  /** Same id as the snapshot. */
+  id: string;
+  holders: { wallet: string; balance: string }[];
+}
+
+export interface TokenReport {
+  id: string;
+  /** Application this report was fetched for. */
+  applicationId: string;
+  mint: string;
+  fetchedAt: string;
+  tokenProgram: string | null;
+  decimals: number | null;
+  supply: string | null;
+  mintAuthority: string | null;
+  freezeAuthority: string | null;
+  top10Pct: number | null;
+  largestAccounts: { address: string; amount: string; pct: number }[];
+  priceUsd: number | null;
+  marketCapUsd: number | null;
+  fdvUsd: number | null;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  pairUrl: string | null;
+  pairCreatedAt: string | null;
+  holderCount: number | null;
+  errors: string[];
 }
 
 export interface PlatformStats {

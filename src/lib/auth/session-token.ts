@@ -1,7 +1,7 @@
 /**
  * Minimal signed session token (HMAC-SHA256) using Web Crypto, so it works in
- * both the Next.js proxy and server runtime. Used for the demo-mode admin
- * session when Supabase Auth is not configured.
+ * both the Next.js proxy and server runtime. Used for the admin
+ * session.
  *
  * Token format: base64url(JSON payload) + "." + base64url(signature)
  */

@@ -5,18 +5,18 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { loginAction, type LoginState } from "./actions";
 
-export function LoginForm({ mode }: { mode: "supabase" | "demo" }) {
+export function LoginForm() {
   const [state, action, pending] = useActionState<LoginState, FormData>(loginAction, {});
   return (
     <form action={action} className="space-y-4">
       <div>
         <label htmlFor="email" className="text-sm font-medium">
-          {mode === "supabase" ? "Email" : "Username"}
+          Username
         </label>
         <input
           id="email"
           name="email"
-          type={mode === "supabase" ? "email" : "text"}
+          type="text"
           autoComplete="username"
           required
           className="field mt-1.5"

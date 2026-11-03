@@ -24,3 +24,6 @@ npm-debug.log*
 /screenshots
 supabase/.temp
 supabase/.branches
+
+# local database (contains your real data — back it up, never commit it)
+/data

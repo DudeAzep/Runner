@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AdminForm } from "@/components/admin/AdminForm";
 import { ScreeningFields } from "@/components/admin/ScreeningFields";
+import { TokenReportPanel } from "@/components/admin/TokenReportPanel";
 import { AllocationBar } from "@/components/campaign/AllocationBar";
 import { ProjectLogo } from "@/components/campaign/ProjectLogo";
 import { averageScore } from "@/components/campaign/ScreeningReport";
@@ -14,7 +15,8 @@ import { Badge, SourceBadge } from "@/components/ui/Badge";
 import { adminRepository } from "@/lib/auth/admin-data";
 import { CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
 import { formatDateTime, formatUsdCents } from "@/lib/format";
-import { createCampaignAction, saveScreeningAction, setApplicationStatusAction } from "../../../actions";
+import { createCampaignAction, fetchTokenReportAction, saveScreeningAction, setApplicationStatusAction } from "../../../actions";
+import { getConfig } from "@/lib/config";
 
 export const metadata = { title: "Application" };
 
@@ -42,9 +44,10 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { repo } = await adminRepository();
-  const detail = await repo.getApplicationDetail(id);
+  const detail = repo.getApplicationDetail(id);
   if (!detail) notFound();
-  const { application: a, screening, campaign } = detail;
+  const { application: a, screening, campaign, tokenReport } = detail;
+  const cluster = getConfig().cluster;
   const pkg = CAMPAIGN_PACKAGES[a.campaignPackage];
   const decided = a.status === "approved" || a.status === "rejected";
 
@@ -99,10 +102,46 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                 {pkg.name} · {formatUsdCents(pkg.feeUsdCents)} USDC
               </Row>
               <Row label="Payment">
-                <Badge tone="amber">{a.paymentStatus === "test_mode_simulated" ? "TEST MODE — simulated" : "Unpaid"}</Badge>
+                {a.paymentStatus === "paid" ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Badge tone="volt">PAID · verified on-chain</Badge>
+                    {a.paymentSignature && (
+                      <a
+                        className="font-mono text-xs text-violet-300 hover:underline"
+                        href={`https://solscan.io/tx/${a.paymentSignature}${cluster === "devnet" ? "?cluster=devnet" : ""}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {a.paymentSignature.slice(0, 16)}… ↗
+                      </a>
+                    )}
+                  </span>
+                ) : a.paymentStatus === "awaiting_payment" ? (
+                  <Badge tone="violet">Awaiting payment — cannot be approved yet</Badge>
+                ) : (
+                  <Badge tone="amber">TEST MODE — simulated</Badge>
+                )}
               </Row>
               <Row label="Submitted">{formatDateTime(a.createdAt)}</Row>
             </dl>
+          </Panel>
+
+          <Panel title="On-chain & market data" aside={tokenReport ? undefined : <Badge>Not fetched</Badge>}>
+            {tokenReport && <TokenReportPanel report={tokenReport} />}
+            <AdminForm
+              action={fetchTokenReportAction}
+              hidden={{ applicationId: a.id }}
+              submitLabel={tokenReport ? "Refresh data" : "Fetch on-chain data"}
+              submitVariant="secondary"
+              className={tokenReport ? "mt-5" : ""}
+            >
+              {!tokenReport && (
+                <p className="text-sm text-fg-muted">
+                  Reads the mint (supply, decimals, mint/freeze authority), largest holders, and DexScreener market data. Results pre-fill the
+                  screening form below.
+                </p>
+              )}
+            </AdminForm>
           </Panel>
 
           <Panel
@@ -111,7 +150,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           >
             <AdminForm action={saveScreeningAction} hidden={{ applicationId: a.id }} submitLabel={screening ? "Update screening report" : "Save screening report"}>
               {/* Re-key on save so uncontrolled inputs pick up the stored values after React's post-action form reset. */}
-              <ScreeningFields key={screening?.createdAt ?? "new"} screening={screening} />
+              <ScreeningFields key={screening?.createdAt ?? tokenReport?.fetchedAt ?? "new"} screening={screening} report={tokenReport} />
             </AdminForm>
           </Panel>
         </div>
