@@ -28,7 +28,6 @@ describe("applicationSchema", () => {
     telegram: "https://t.me/test",
     discord: "https://discord.gg/test",
     description: "A sufficiently long description of the test project for validation.",
-    applicantWallet: "DbF5KSt39LEiJEf2uZZTwzcNvxzVxUABHXHSuK6ZSghx",
     campaignPackage: "growth",
     acceptTerms: true,
   };
@@ -37,9 +36,9 @@ describe("applicationSchema", () => {
     assert.ok(r.success);
     assert.equal(r.data.ticker, "TEST");
   });
-  it("rejects wrong social hosts and bad wallets", () => {
+  it("rejects wrong social hosts and bad addresses", () => {
     assert.equal(applicationSchema.safeParse({ ...valid, twitter: "https://evil.com/x.com" }).success, false);
-    assert.equal(applicationSchema.safeParse({ ...valid, applicantWallet: "not-a-wallet" }).success, false);
+    assert.equal(applicationSchema.safeParse({ ...valid, contractAddress: "not-a-mint" }).success, false);
     assert.equal(applicationSchema.safeParse({ ...valid, website: "http://insecure.example" }).success, false);
     assert.equal(applicationSchema.safeParse({ ...valid, acceptTerms: false }).success, false);
     assert.equal(applicationSchema.safeParse({ ...valid, campaignPackage: "platinum" }).success, false);

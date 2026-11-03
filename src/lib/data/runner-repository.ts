@@ -32,6 +32,9 @@ const now = () => new Date().toISOString();
 const newId = (prefix: string) => `${prefix}-${globalThis.crypto.randomUUID()}`;
 const clone = <T>(v: T): T => structuredClone(v);
 
+/** Applying is free, so one wallet can have at most this many applications in review at once. */
+export const MAX_OPEN_APPLICATIONS_PER_WALLET = 3;
+
 /**
  * All RUNNER business rules live here. Server-only; mutating methods are
  * called from server actions AFTER authorization.
@@ -137,12 +140,19 @@ export class RunnerRepository {
     return a ? clone(a) : null;
   }
 
-  createApplication(input: NewApplication, opts: { livePayments: boolean }): Application {
+  /**
+   * New applications are free to submit: the fee is requested only after
+   * approval, so every application starts as "awaiting_payment".
+   */
+  createApplication(input: NewApplication): Application {
     const s = store();
-    const dup = s.applications.find(
-      (a) => a.contractAddress === input.contractAddress && (a.status === "submitted" || a.status === "under_review") && a.source !== "demo",
-    );
+    const open = (a: Application) => (a.status === "submitted" || a.status === "under_review") && a.source !== "demo";
+    const dup = s.applications.find((a) => a.contractAddress === input.contractAddress && open(a));
     if (dup) throw new RepositoryError("An application for this contract address is already pending review.", "conflict");
+    // Submitting is free, so cap how many open applications one wallet can have.
+    if (s.applications.filter((a) => a.applicantWallet === input.applicantWallet && open(a)).length >= MAX_OPEN_APPLICATIONS_PER_WALLET) {
+      throw new RepositoryError(`You already have ${MAX_OPEN_APPLICATIONS_PER_WALLET} applications in review. Wait for a decision before applying again.`, "conflict");
+    }
     let reference = generateReference();
     while (s.applications.some((a) => a.reference === reference)) reference = generateReference();
     const t = now();
@@ -151,7 +161,7 @@ export class RunnerRepository {
       id: newId("app"),
       reference,
       status: "submitted",
-      paymentStatus: opts.livePayments ? "awaiting_payment" : "test_mode_simulated",
+      paymentStatus: "awaiting_payment",
       paymentSignature: null,
       paymentPayer: null,
       paidAt: null,
@@ -171,6 +181,7 @@ export class RunnerRepository {
     const app = store().applications.find((a) => a.reference === reference);
     if (!app) throw new RepositoryError("Application not found", "not_found");
     if (app.paymentStatus === "paid") return clone(app);
+    if (app.status !== "approved") throw new RepositoryError("The fee can only be paid after the application is approved.", "invalid_state");
     if (this.isSignatureUsed(payment.signature)) throw new RepositoryError("This transaction was already used for another payment.", "conflict");
     const updated: Application = { ...app, paymentStatus: "paid", paymentSignature: payment.signature, paymentPayer: payment.payer, paidAt: now(), updatedAt: now() };
     atomic(() => {
@@ -178,6 +189,26 @@ export class RunnerRepository {
       save("usedSignatures", { id: payment.signature, usedFor: `payment:${reference}`, at: now() });
     });
     return clone(updated);
+  }
+
+  /** TEST MODE only (the caller checks the mode): records a simulated fee payment for an approved application. */
+  markApplicationTestPaid(reference: string): Application {
+    const app = store().applications.find((a) => a.reference === reference);
+    if (!app) throw new RepositoryError("Application not found", "not_found");
+    if (app.status !== "approved") throw new RepositoryError("The fee can only be paid after the application is approved.", "invalid_state");
+    if (app.paymentStatus !== "awaiting_payment") return clone(app);
+    const updated: Application = { ...app, paymentStatus: "test_mode_simulated", paidAt: now(), updatedAt: now() };
+    save("applications", updated);
+    return clone(updated);
+  }
+
+  /** Applications submitted by a wallet, newest first, for the applicant's Status page. */
+  listApplicationsForWallet(wallet: string): PublicApplicationStatus[] {
+    return store()
+      .applications.filter((a) => a.applicantWallet === wallet)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .map((a) => this.getApplicationStatus(a.reference)!)
+      .filter(Boolean);
   }
 
   getAdminOverview(): AdminOverview {
@@ -212,12 +243,12 @@ export class RunnerRepository {
 
   /**
    * Applicants still waiting for a decision, for the public "Upcoming" teasers.
-   * Unpaid applications are left out so spam submissions never appear publicly.
    * Server-only: the page must never pass these fields to the browser.
    */
   listPendingApplicantMints(): { id: string; contractAddress: string; createdAt: string; demo: boolean }[] {
     return store()
-      .applications.filter((a) => (a.status === "submitted" || a.status === "under_review") && a.paymentStatus !== "awaiting_payment")
+      // Applying now requires a wallet sign-in (with a per-wallet cap), and the fee is paid only after approval.
+      .applications.filter((a) => a.status === "submitted" || a.status === "under_review")
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
       .map((a) => ({ id: a.id, contractAddress: a.contractAddress, createdAt: a.createdAt, demo: a.source === "demo" }));
   }
@@ -277,8 +308,8 @@ export class RunnerRepository {
     const app = s.applications.find((a) => a.id === applicationId);
     if (!app) throw new RepositoryError("Application not found", "not_found");
     if (status === "approved") {
+      // The fee is requested after approval, so approval doesn't need payment; creating the campaign does.
       if (!s.screenings.some((x) => x.applicationId === applicationId)) throw new RepositoryError("Save a screening report before approving.", "invalid_state");
-      if (app.paymentStatus === "awaiting_payment") throw new RepositoryError("This application has not paid its campaign fee yet.", "invalid_state");
     }
     if (status === "rejected" && s.campaigns.some((c) => c.applicationId === applicationId && c.status !== "cancelled")) {
       throw new RepositoryError("Cancel the linked campaign before rejecting this application.", "invalid_state");
@@ -295,6 +326,7 @@ export class RunnerRepository {
     const app = s.applications.find((a) => a.id === applicationId);
     if (!app) throw new RepositoryError("Application not found", "not_found");
     if (app.status !== "approved") throw new RepositoryError("Only approved applications can become campaigns.", "invalid_state");
+    if (app.paymentStatus === "awaiting_payment") throw new RepositoryError("The applicant hasn't paid the campaign fee yet.", "invalid_state");
     if (s.campaigns.some((c) => c.applicationId === applicationId)) throw new RepositoryError("A campaign already exists for this application.", "conflict");
     const screening = s.screenings.find((x) => x.applicationId === applicationId);
     const report = s.tokenReports.find((r) => r.applicationId === applicationId);

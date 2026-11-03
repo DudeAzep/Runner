@@ -27,27 +27,22 @@ describe("RunnerRepository lifecycle", () => {
     assert.ok(repo.demoRecordCount() > 0);
   });
 
-  it("creates a live-payment application that can't be approved until paid", () => {
-    const app = repo.createApplication(
-      {
-        projectName: "Lifecycle Test",
-        ticker: "LIFE",
-        contractAddress: "2zFfqTWyQ1cky7MhSuQQBGQUy5JVpn9aYMZM5uUKx7q5".slice(0, 43) + "1",
-        website: "https://x.example",
-        twitter: "https://x.com/x",
-        telegram: "https://t.me/x",
-        discord: "https://discord.gg/x",
-        description: "A long enough description for the lifecycle integration test.",
-        applicantWallet: W1,
-        campaignPackage: "starter",
-      },
-      { livePayments: true },
-    );
-    appId = app.id;
-    ref = app.reference;
-    assert.equal(app.paymentStatus, "awaiting_payment");
+  const newApp = (wallet: string, contractAddress: string, projectName = "Lifecycle Test") =>
+    repo.createApplication({
+      projectName,
+      ticker: "LIFE",
+      contractAddress,
+      website: "https://x.example",
+      twitter: "https://x.com/x",
+      telegram: "https://t.me/x",
+      discord: "https://discord.gg/x",
+      description: "A long enough description for the lifecycle integration test.",
+      applicantWallet: wallet,
+      campaignPackage: "starter",
+    });
+  const screen = (id: string) =>
     repo.saveScreening(
-      appId,
+      id,
       {
         liquidityScore: 7, holderDistributionScore: 7, developerActivityScore: 7, communityScore: 7, tradingActivityScore: 7,
         tokenAuthoritiesScore: 10, tokenomicsScore: 7, manipulationScore: 7, marketCapUsd: null, liquidityUsd: null, holderCount: null,
@@ -55,20 +50,37 @@ describe("RunnerRepository lifecycle", () => {
       },
       "tester",
     );
-    assert.throws(() => repo.setApplicationStatus(appId, "approved"), /not paid/);
+
+  it("submits for free, approves without payment, and blocks the campaign until paid", () => {
+    const app = newApp(W1, "2zFfqTWyQ1cky7MhSuQQBGQUy5JVpn9aYMZM5uUKx7q1");
+    appId = app.id;
+    ref = app.reference;
+    assert.equal(app.paymentStatus, "awaiting_payment");
+    assert.deepEqual(repo.listApplicationsForWallet(W1).map((a) => a.reference), [ref]);
+    // Paying before approval is refused.
+    assert.throws(() => repo.markApplicationPaid(ref, { signature: "6".repeat(88), payer: W1 }), /after the application is approved/);
+    screen(appId);
+    repo.setApplicationStatus(appId, "approved");
+    assert.throws(() => repo.createCampaignFromApplication(appId, { status: "active", featured: false, snapshotAt: null }), /hasn't paid/);
   });
 
-  it("marks payment once and rejects signature reuse", () => {
+  it("limits how many applications one wallet can have in review", () => {
+    for (let i = 0; i < 3; i++) newApp(W3, `CapTest${i}1111111111111111111111111111111111`.slice(0, 44), `Cap ${i}`);
+    assert.throws(() => newApp(W3, "CapTest91111111111111111111111111111111111111".slice(0, 44)), /already have 3/);
+  });
+
+  it("marks payment once after approval and rejects signature reuse", () => {
     const sig = "5".repeat(88);
     repo.markApplicationPaid(ref, { signature: sig, payer: W1 });
     assert.equal(repo.getApplicationByReference(ref)?.paymentStatus, "paid");
     assert.ok(repo.isSignatureUsed(sig));
-    const other = repo.listApplications({ status: "submitted" }).find((a) => a.source === "demo")!;
-    assert.throws(() => repo.markApplicationPaid(other.reference, { signature: sig, payer: W1 }), /already used/);
+    const other = newApp(W2, "3zFfqTWyQ1cky7MhSuQQBGQUy5JVpn9aYMZM5uUKx7q1", "Other");
+    screen(other.id);
+    repo.setApplicationStatus(other.id, "approved");
+    assert.throws(() => repo.markApplicationPaid(other.reference, { signature: sig, payer: W2 }), /already used/);
   });
 
-  it("approves and creates a campaign with its package's split", () => {
-    repo.setApplicationStatus(appId, "approved");
+  it("creates a campaign with its package's split once paid", () => {
     const c = repo.createCampaignFromApplication(appId, { status: "active", featured: false, snapshotAt: null });
     campaignId = c.id;
     // Starter: $500 at 70/20/10.

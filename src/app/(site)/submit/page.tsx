@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Container, PageHeader } from "@/components/layout/PageHeader";
-import { getPublicConfig } from "@/lib/config";
+import { WalletGate } from "@/components/wallet/WalletGate";
+import { getWalletSession } from "@/lib/auth/wallet";
 import { PACKAGE_IDS } from "@/lib/economics/allocation";
 import { SubmitForm } from "./SubmitForm";
 
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "Submit a Project" };
 
 export default async function SubmitPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection(); // read settings at request time, not build time
-  const cfg = getPublicConfig();
+  const sessionWallet = await getWalletSession();
   const requested = (await searchParams).package;
   const initialPackage = PACKAGE_IDS.find((id) => id === requested);
   return (
@@ -19,7 +20,7 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
       <PageHeader
         eyebrow="Project application"
         title="Submit your project"
-        description="Apply for a RUNNER campaign. Approved projects receive a treasury token purchase distributed to eligible RUNNER holders."
+        description="Apply for a RUNNER campaign. It's free to apply: you only pay the campaign fee if your project is approved."
       />
 
       <div className="mb-8 flex items-start gap-3 rounded-lg border border-violet-500/40 bg-violet-500/[0.07] p-5" role="note">
@@ -39,7 +40,13 @@ export default async function SubmitPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <SubmitForm paymentsLive={cfg.paymentsLive} cluster={cfg.cluster} initialPackage={initialPackage} />
+      <WalletGate
+        sessionWallet={sessionWallet}
+        title="Sign in with your wallet to apply"
+        description="Your application is linked to the wallet you sign in with, so you can track it and pay the fee later from the Status page. No address to type, and no payment now."
+      >
+        <SubmitForm initialPackage={initialPackage} />
+      </WalletGate>
     </Container>
   );
 }

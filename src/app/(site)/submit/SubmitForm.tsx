@@ -1,11 +1,8 @@
 "use client";
 
-import { useWallet } from "@solana/wallet-adapter-react";
-import { CheckCircle2, CircleCheck, Copy, CreditCard, FlaskConical, LoaderCircle, ShieldAlert } from "lucide-react";
+import { CheckCircle2, CircleCheck, CreditCard, LoaderCircle, ShieldAlert } from "lucide-react";
 import { useActionState, useState, type ReactNode } from "react";
 import { ApplicationStatusBadge } from "@/components/campaign/StatusBadges";
-import { PayWithWallet } from "@/components/wallet/PayWithWallet";
-import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { allocationForPackage, CAMPAIGN_PACKAGES, PACKAGE_IDS, type CampaignPackageId } from "@/lib/economics/allocation";
@@ -62,27 +59,22 @@ function Section({ step, title, children }: { step: number; title: string; child
   );
 }
 
-interface PaymentConfig {
-  paymentsLive: boolean;
-  cluster: "mainnet-beta" | "devnet";
+interface SubmitFormProps {
   /** Preselected package, e.g. from /submit?package=starter. */
   initialPackage?: CampaignPackageId;
 }
 
-export function SubmitForm(props: PaymentConfig) {
+export function SubmitForm(props: SubmitFormProps) {
   const [formKey, setFormKey] = useState(0);
   return <SubmitFormInner key={formKey} onReset={() => setFormKey((k) => k + 1)} {...props} />;
 }
 
-function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { onReset: () => void } & PaymentConfig) {
+function SubmitFormInner({ onReset, initialPackage }: { onReset: () => void } & SubmitFormProps) {
   const [state, action, pending] = useActionState<SubmitState, FormData>(submitApplication, { status: "idle" });
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const [pkg, setPkg] = useState<CampaignPackageId>(initialPackage ?? "growth");
-  const [paid, setPaid] = useState<string | null>(null);
-  const [paying, setPaying] = useState(false);
-  const { publicKey } = useWallet();
 
-  if (state.status === "success") return <Confirmation state={state} onReset={onReset} cluster={cluster} />;
+  if (state.status === "success") return <Confirmation state={state} onReset={onReset} />;
 
   const values = state.status === "error" ? state.values : {};
   const serverErrors = state.status === "error" ? state.fieldErrors : {};
@@ -118,15 +110,6 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
   const selected = CAMPAIGN_PACKAGES[pkg];
   const alloc = allocationForPackage(pkg);
   const pct = (bps: number) => `${bps / 100}%`;
-
-  const simulatePayment = () => {
-    setPaying(true);
-    setTimeout(() => {
-      const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-      setPaid(`TEST-${rand}`);
-      setPaying(false);
-    }, 900);
-  };
 
   return (
     <form action={action} noValidate className="space-y-6">
@@ -181,27 +164,7 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
         </div>
       </Section>
 
-      <Section step={3} title="Applicant">
-        <Field name="applicantWallet" label="Applicant wallet address" error={err("applicantWallet")} hint="Solana wallet used to contact you about this application.">
-          <input
-            key={publicKey?.toBase58() ?? "none"}
-            id="applicantWallet"
-            name="applicantWallet"
-            required
-            defaultValue={values.applicantWallet || publicKey?.toBase58() || ""}
-            aria-invalid={err("applicantWallet") ? true : undefined}
-            aria-describedby={err("applicantWallet") ? "applicantWallet-error" : undefined}
-            onBlur={(e) => e.currentTarget.value && validate("applicantWallet", e.currentTarget.value)}
-            placeholder="Your Solana wallet"
-            className="field font-mono text-[13px]"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </Field>
-        {publicKey && <p className="-mt-3 text-xs text-volt-400">Prefilled from your connected wallet.</p>}
-      </Section>
-
-      <Section step={4} title="Campaign package">
+      <Section step={3} title="Campaign package">
         <div id="package" role="radiogroup" aria-label="Campaign package" className="grid gap-3 md:grid-cols-3">
           {PACKAGE_IDS.map((id) => {
             const p = CAMPAIGN_PACKAGES[id];
@@ -224,7 +187,6 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
                   checked={pkg === id}
                   onChange={() => {
                     setPkg(id);
-                    setPaid(null);
                   }}
                   className="sr-only"
                 />
@@ -256,72 +218,17 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
         </div>
       </Section>
 
-      {paymentsLive ? (
-        <div className="rounded-lg border border-violet-500/40 bg-violet-500/[0.06] p-5 sm:p-6">
-          <div className="flex items-center gap-2">
-            <CreditCard className="size-4 text-violet-300" aria-hidden />
-            <h2 className="text-[15px] font-semibold">Campaign fee payment · {formatUsdCents(alloc.totalUsdCents)} USDC</h2>
-            {cluster === "devnet" && <Badge tone="amber">DEVNET</Badge>}
-          </div>
-          <p className="mt-3 text-sm text-fg-muted">
-            After you submit, you&apos;ll pay the fee in USDC from your Solana wallet. The payment is verified on-chain before screening
-            begins. If approved, {formatUsdCents(alloc.rewardUsdCents)} ({pct(selected.allocationBps.reward)}) is used to buy your token for RUNNER holders.
+      <div className="flex items-start gap-3 rounded-lg border border-violet-500/30 bg-violet-500/[0.05] p-5 text-sm sm:p-6">
+        <CreditCard className="mt-0.5 size-4 shrink-0 text-violet-300" aria-hidden />
+        <div>
+          <h2 className="text-[15px] font-semibold text-fg">No payment now</h2>
+          <p className="mt-1.5 text-fg-muted">
+            Submitting is free. If your project is approved, you&apos;ll pay the {selected.name} fee of{" "}
+            <span className="font-medium text-fg">{formatUsdCents(alloc.totalUsdCents)} USDC</span> from your <span className="text-fg">Status</span>{" "}
+            page. {formatUsdCents(alloc.rewardUsdCents)} ({pct(selected.allocationBps.reward)}) of it buys your token for RUNNER holders.
           </p>
         </div>
-      ) : (
-      <fieldset className="relative overflow-hidden rounded-lg border border-dashed border-amber-400/40 bg-amber-400/[0.03] p-5 sm:p-6">
-        <legend className="sr-only">Simulated payment</legend>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <CreditCard className="size-4 text-amber-400" aria-hidden />
-            <h2 className="text-[15px] font-semibold">Campaign fee payment</h2>
-          </div>
-          <Badge tone="amber">
-            <FlaskConical className="size-3" /> TEST MODE — NO REAL PAYMENT
-          </Badge>
-        </div>
-        <p className="mt-3 text-sm text-fg-muted">
-          This MVP does not collect funds. The button below simulates a USDC payment authorization so the full flow can be tested. No
-          wallet signature is requested and nothing is charged.
-        </p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-          <dl className="tabular grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-            <div>
-              <dt className="text-xs text-fg-subtle">Package</dt>
-              <dd className="mt-0.5 font-medium">{selected.name}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-fg-subtle">Fee</dt>
-              <dd className="mt-0.5 font-medium">{formatUsdCents(alloc.totalUsdCents)} USDC</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-fg-subtle">{pct(selected.allocationBps.reward)} purchases</dt>
-              <dd className="mt-0.5 font-medium text-volt-400">{formatUsdCents(alloc.rewardUsdCents)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-fg-subtle">
-                {pct(selected.allocationBps.operations)} / {pct(selected.allocationBps.reserve)}
-              </dt>
-              <dd className="mt-0.5 font-medium text-fg-muted">
-                {formatUsdCents(alloc.operationsUsdCents)} / {formatUsdCents(alloc.reserveUsdCents)}
-              </dd>
-            </div>
-          </dl>
-          {paid ? (
-            <div className="inline-flex items-center gap-2 rounded-md border border-volt-400/30 bg-volt-400/10 px-3 py-2 text-sm text-volt-400" role="status">
-              <CheckCircle2 className="size-4" /> Simulated · {paid}
-            </div>
-          ) : (
-            <Button type="button" variant="secondary" onClick={simulatePayment} disabled={paying} className="border-amber-400/40">
-              {paying ? <LoaderCircle className="size-4 animate-spin" /> : <FlaskConical className="size-4 text-amber-400" />}
-              Simulate {formatUsdCents(alloc.totalUsdCents)} USDC payment
-            </Button>
-          )}
-        </div>
-        <input type="hidden" name="testPaymentConfirmed" value={paid ? "yes" : ""} />
-        {serverErrors.payment && !paid && <p className="mt-3 text-xs text-rose-400">{serverErrors.payment}</p>}
-      </fieldset>
-      )}
+      </div>
 
       <div className="surface p-5 sm:p-6">
         <label className="flex items-start gap-3 text-sm text-fg-muted">
@@ -334,28 +241,18 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
         {err("acceptTerms") && <p className="mt-2 text-xs text-rose-400">{err("acceptTerms")}</p>}
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-fg-subtle">Fields marked * are required.</p>
-          <Button type="submit" size="lg" disabled={pending || (!paymentsLive && !paid)}>
+          <Button type="submit" size="lg" disabled={pending}>
             {pending && <LoaderCircle className="size-4 animate-spin" />}
             {pending ? "Submitting…" : "Submit application"}
           </Button>
         </div>
-        {!paymentsLive && !paid && <p className="mt-3 text-right text-xs text-amber-400">Complete the TEST MODE payment step to enable submission.</p>}
       </div>
     </form>
   );
 }
 
-function Confirmation({
-  state,
-  onReset,
-  cluster,
-}: {
-  state: Extract<SubmitState, { status: "success" }>;
-  onReset: () => void;
-  cluster: "mainnet-beta" | "devnet";
-}) {
-  const awaiting = state.paymentStatus === "awaiting_payment";
-  const [copied, setCopied] = useState(false);
+function Confirmation({ state, onReset }: { state: Extract<SubmitState, { status: "success" }>; onReset: () => void }) {
+  const fee = CAMPAIGN_PACKAGES[state.campaignPackage].feeUsdCents;
   return (
     <div className="surface animate-fade-up p-6 sm:p-10" role="status">
       <div className="flex size-12 items-center justify-center rounded-md border border-volt-400/30 bg-volt-400/10">
@@ -363,26 +260,14 @@ function Confirmation({
       </div>
       <h2 className="mt-6 text-2xl font-semibold tracking-tight">Application received</h2>
       <p className="mt-2 max-w-xl text-sm text-fg-muted">
-        {state.projectName} (${state.ticker}) has been submitted for independent screening. Save your reference number to check its status.
+        {state.projectName} (${state.ticker}) has been submitted for independent screening. You can follow it anytime on the Status page
+        while signed in with this wallet.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-md border border-ink-600 bg-ink-900 p-4 sm:col-span-1">
-          <div className="label">Reference number</div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="font-mono text-xl font-semibold tracking-wider text-violet-300">{state.reference}</span>
-            <button
-              type="button"
-              aria-label="Copy reference"
-              className="text-fg-subtle hover:text-fg"
-              onClick={() => {
-                void navigator.clipboard?.writeText(state.reference);
-                setCopied(true);
-              }}
-            >
-              {copied ? <CircleCheck className="size-4 text-volt-400" /> : <Copy className="size-4" />}
-            </button>
-          </div>
+        <div className="rounded-md border border-ink-600 bg-ink-900 p-4">
+          <div className="label">Reference</div>
+          <div className="mt-2 font-mono text-lg font-semibold tracking-wider text-violet-300">{state.reference}</div>
         </div>
         <div className="rounded-md border border-ink-600 bg-ink-900 p-4">
           <div className="label">Status</div>
@@ -391,37 +276,43 @@ function Confirmation({
           </div>
         </div>
         <div className="rounded-md border border-ink-600 bg-ink-900 p-4">
-          <div className="label">Package · Payment</div>
+          <div className="label">Package · Fee</div>
           <div className="mt-2 text-sm">
-            {CAMPAIGN_PACKAGES[state.campaignPackage].name} ·{" "}
-            {awaiting ? <span className="text-violet-300">Awaiting payment</span> : <span className="text-amber-400">TEST MODE (simulated)</span>}
+            {CAMPAIGN_PACKAGES[state.campaignPackage].name} · {formatUsdCents(fee)} USDC{" "}
+            <span className="text-fg-subtle">(only if approved)</span>
           </div>
         </div>
       </div>
 
-      {awaiting && (
-        <div className="mt-6">
-          <PayWithWallet reference={state.reference} amountUsd={(CAMPAIGN_PACKAGES[state.campaignPackage].feeUsdCents / 100).toFixed(2)} cluster={cluster} />
-        </div>
-      )}
-
-      <div className="mt-6 flex items-start gap-3 rounded-md border border-ink-700 bg-ink-900/60 p-4 text-sm text-fg-muted">
-        <ShieldAlert className="mt-0.5 size-4 shrink-0 text-violet-400" />
-        <p>
-          Submitted {formatDateTime(state.createdAt)}. Screening typically reviews liquidity, holder concentration, token authorities, and
+      <ol className="mt-6 space-y-2 rounded-md border border-ink-700 bg-ink-900/60 p-4 text-sm text-fg-muted">
+        <li>
+          <span className="font-medium text-fg">1. Screening.</span> RUNNER reviews liquidity, holder concentration, token authorities, and
           manipulation indicators. Approval is not guaranteed.
-        </p>
-      </div>
+        </li>
+        <li>
+          <span className="font-medium text-fg">2. If approved,</span> pay the fee from your Status page.
+        </li>
+        <li>
+          <span className="font-medium text-fg">3. Campaign.</span> Once paid, your campaign is scheduled and appears on Explore.
+        </li>
+      </ol>
+      <p className="mt-3 flex items-center gap-2 text-xs text-fg-subtle">
+        <ShieldAlert className="size-3.5" aria-hidden /> Submitted {formatDateTime(state.createdAt)}.
+      </p>
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <ButtonLink href={`/status?ref=${state.reference}`}>Track application status</ButtonLink>
+        <ButtonLink href="/status">Go to Status</ButtonLink>
         <ButtonLink href="/explore" variant="secondary">
           Explore campaigns
         </ButtonLink>
-        <button type="button" className="inline-flex items-center px-2 text-sm text-fg-muted hover:text-fg" onClick={() => {
+        <button
+          type="button"
+          className="inline-flex items-center px-2 text-sm text-fg-muted hover:text-fg"
+          onClick={() => {
             onReset();
             window.scrollTo({ top: 0 });
-          }}>
+          }}
+        >
           Submit another project
         </button>
       </div>

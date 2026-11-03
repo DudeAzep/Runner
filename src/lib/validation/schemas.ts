@@ -41,7 +41,7 @@ export const applicationSchema = z.object({
   telegram: httpsUrl("Telegram URL").refine((u) => hostIs(u, ["t.me", "telegram.me"]), "Must be a t.me link"),
   discord: httpsUrl("Discord URL").refine((u) => hostIs(u, ["discord.gg", "discord.com"]), "Must be a discord.gg or discord.com link"),
   description: z.string().trim().min(40, "Description must be at least 40 characters").max(2000),
-  applicantWallet: solanaAddress("Applicant wallet"),
+  // The applicant's wallet isn't a form field: it comes from their wallet sign-in on the server.
   campaignPackage: z.enum(PACKAGE_IDS as [string, ...string[]], { message: "Select a campaign package" }),
   acceptTerms: z.literal(true, { message: "You must acknowledge the screening notice" }),
 });

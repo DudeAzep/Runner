@@ -13,8 +13,8 @@ import "@/styles/wallet-adapter.css";
  *
  * Wallets that implement the Wallet Standard (Phantom, Solflare, Backpack, …)
  * are discovered automatically, so the explicit adapter list is empty.
- * RUNNER only reads the public key in the MVP — it never requests signatures
- * or sends transactions.
+ * Wallets are asked to sign only when the user acts: a free sign-in message,
+ * or a payment / treasury transaction they approve in the wallet.
  */
 export function SolanaWalletProvider({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl("mainnet-beta"), []);

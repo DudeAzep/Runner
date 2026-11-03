@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { getWalletSession } from "@/lib/auth/wallet";
 import { getConfig } from "@/lib/config";
 import { getRepository } from "@/lib/data";
 import { RepositoryError } from "@/lib/data/repository";
@@ -24,7 +25,7 @@ export type SubmitState =
       paymentStatus: PaymentStatus;
     };
 
-const FIELDS = ["projectName", "ticker", "contractAddress", "website", "twitter", "telegram", "discord", "description", "applicantWallet", "campaignPackage"] as const;
+const FIELDS = ["projectName", "ticker", "contractAddress", "website", "twitter", "telegram", "discord", "description", "campaignPackage"] as const;
 
 // Basic in-memory throttle per process to slow down scripted spam.
 const recent = new Map<string, number[]>();
@@ -44,11 +45,11 @@ async function ipKey() {
 export async function submitApplication(_prev: SubmitState, formData: FormData): Promise<SubmitState> {
   const values: Record<string, string> = {};
   for (const f of FIELDS) values[f] = String(formData.get(f) ?? "");
-  const live = getConfig().paymentsLive;
 
-  // TEST MODE: the simulated payment must be acknowledged. No funds move.
-  if (!live && formData.get("testPaymentConfirmed") !== "yes") {
-    return { status: "error", message: "Complete the TEST MODE payment step before submitting.", fieldErrors: { payment: "Simulated payment required" }, values };
+  // The applicant is whoever signed in with their wallet. No payment is taken now: the fee is requested after approval.
+  const applicantWallet = await getWalletSession();
+  if (!applicantWallet) {
+    return { status: "error", message: "Sign in with your Solana wallet before submitting.", fieldErrors: {}, values };
   }
 
   const parsed = applicationSchema.safeParse({ ...values, acceptTerms: formData.get("acceptTerms") === "on" });
@@ -58,14 +59,14 @@ export async function submitApplication(_prev: SubmitState, formData: FormData):
     return { status: "error", message: "Please fix the highlighted fields.", fieldErrors, values };
   }
 
-  if (throttled(`w:${parsed.data.applicantWallet}`) || throttled(`ip:${await ipKey()}`, 20)) {
+  if (throttled(`w:${applicantWallet}`) || throttled(`ip:${await ipKey()}`, 20)) {
     return { status: "error", message: "Too many submissions. Please try again later.", fieldErrors: {}, values };
   }
 
   try {
     const { acceptTerms: _accepted, ...input } = parsed.data;
     void _accepted;
-    const app = getRepository().createApplication({ ...input, campaignPackage: input.campaignPackage as CampaignPackageId }, { livePayments: live });
+    const app = getRepository().createApplication({ ...input, applicantWallet, campaignPackage: input.campaignPackage as CampaignPackageId });
     return {
       status: "success",
       reference: app.reference,
@@ -112,6 +113,7 @@ export async function preparePayment(reference: string, payer: string): Promise<
     if (throttled(`pay:${await ipKey()}`, 30, 10 * 60_000)) return { ok: false, message: "Too many attempts. Wait a few minutes." };
     const app = awaitingApp(reference);
     if (app.paymentStatus === "paid") return { ok: false, message: "This application is already paid." };
+    if (app.status !== "approved") return { ok: false, message: "The fee can only be paid after your application is approved." };
     const fee = CAMPAIGN_PACKAGES[app.campaignPackage].feeUsdCents;
     const tx = await buildUsdcPayment({ payer, amountRaw: BigInt(fee) * 10_000n, memo: paymentMemo(app.reference) });
     return { ok: true, message: "Approve the payment in your wallet.", data: { ...tx, amount: (fee / 100).toFixed(2) } };
@@ -136,6 +138,7 @@ export async function submitPayment(reference: string, signedTx: string, blockha
     if (!getConfig().paymentsLive) return { ok: false, message: "Payments are in TEST MODE." };
     const app = awaitingApp(reference);
     if (app.paymentStatus === "paid") return { ok: true, message: "Already paid." };
+    if (app.status !== "approved") return { ok: false, message: "The fee can only be paid after your application is approved." };
     const { tx } = decodeSigned(signedTx);
     // Only relay transactions that carry this application's memo.
     const memoBytes = Buffer.from(paymentMemo(app.reference), "utf8");
@@ -159,6 +162,24 @@ export async function verifyPaymentSignature(reference: string, signature: strin
     const app = awaitingApp(reference);
     if (app.paymentStatus === "paid") return { ok: true, message: "Already paid." };
     return settle(app.reference, signature.trim(), await fetchParsedTx(signature.trim()));
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/**
+ * TEST MODE stand-in for paying the fee after approval. Only the signed-in
+ * wallet that submitted the application can do this. No funds move.
+ */
+export async function simulateFeePayment(reference: string): Promise<PaymentResult> {
+  try {
+    if (getConfig().paymentsLive) return { ok: false, message: "Payments are live. Pay with your wallet instead." };
+    const wallet = await getWalletSession();
+    if (!wallet) return { ok: false, message: "Sign in with your wallet first." };
+    const app = awaitingApp(reference);
+    if (app.applicantWallet !== wallet) return { ok: false, message: "This application belongs to a different wallet." };
+    getRepository().markApplicationTestPaid(app.reference);
+    return { ok: true, message: "TEST MODE payment recorded. No funds moved." };
   } catch (e) {
     return fail(e);
   }

@@ -117,7 +117,11 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                     )}
                   </span>
                 ) : a.paymentStatus === "awaiting_payment" ? (
-                  <Badge tone="violet">Awaiting payment — cannot be approved yet</Badge>
+                  a.status === "approved" ? (
+                    <Badge tone="violet">Approved · waiting for the applicant to pay</Badge>
+                  ) : (
+                    <Badge>Not requested yet · fee is paid after approval</Badge>
+                  )
                 ) : (
                   <Badge tone="amber">TEST MODE — simulated</Badge>
                 )}
@@ -171,7 +175,10 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                   confirm={{
                     title: `Approve ${a.projectName}?`,
                     body: screening ? (
-                      <>The application will be marked approved. You can then create its campaign.</>
+                      <>
+                        The application will be marked approved and the applicant will be asked to pay the {formatUsdCents(pkg.feeUsdCents)} fee from
+                        their Status page. You can create the campaign once it&apos;s paid.
+                      </>
                     ) : (
                       <>No screening report has been saved yet — approval will be refused until one exists.</>
                     ),
@@ -218,6 +225,11 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                   Manage campaign <ArrowUpRight className="size-3.5" />
                 </Link>
               </div>
+            ) : a.status === "approved" && a.paymentStatus === "awaiting_payment" ? (
+              <p className="text-sm text-fg-muted">
+                Waiting for the applicant to pay the {formatUsdCents(pkg.feeUsdCents)} fee from their Status page. You can create the campaign once
+                it&apos;s paid.
+              </p>
             ) : a.status === "approved" ? (
               <AdminForm
                 action={createCampaignAction}
