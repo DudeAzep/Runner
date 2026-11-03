@@ -210,6 +210,18 @@ export class RunnerRepository {
       .reduce((sum, a) => sum + CAMPAIGN_PACKAGES[a.campaignPackage].feeUsdCents, 0);
   }
 
+  /**
+   * Applicants still waiting for a decision, for the public "Upcoming" teasers.
+   * Unpaid applications are left out so spam submissions never appear publicly.
+   * Server-only: the page must never pass these fields to the browser.
+   */
+  listPendingApplicantMints(): { id: string; contractAddress: string; createdAt: string }[] {
+    return store()
+      .applications.filter((a) => (a.status === "submitted" || a.status === "under_review") && a.paymentStatus !== "awaiting_payment")
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .map((a) => ({ id: a.id, contractAddress: a.contractAddress, createdAt: a.createdAt }));
+  }
+
   listApplications(opts: { search?: string; status?: ApplicationStatus | "all" } = {}): Application[] {
     let list = [...store().applications];
     if (opts.status && opts.status !== "all") list = list.filter((a) => a.status === opts.status);

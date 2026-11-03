@@ -2,19 +2,23 @@ import { FlaskConical, Inbox, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
+import { TeaserCard } from "@/components/campaign/TeaserCard";
 import { Container, PageHeader } from "@/components/layout/PageHeader";
 import { ButtonLink } from "@/components/ui/Button";
 import { getRepositoryForRequest } from "@/lib/data";
 import { cn } from "@/lib/cn";
-import type { CampaignFilter, CampaignSort } from "@/lib/types";
+import { getLiveMarketCaps } from "@/lib/solana/market";
+import type { CampaignSort } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Explore Campaigns" };
 
-const FILTERS: { id: CampaignFilter; label: string }[] = [
+// "Upcoming" here means applicants still under review, shown as blurred teasers.
+type ExploreFilter = "all" | "approved" | "upcoming";
+
+const FILTERS: { id: ExploreFilter; label: string }[] = [
   { id: "all", label: "All campaigns" },
   { id: "approved", label: "Approved" },
   { id: "upcoming", label: "Upcoming" },
-  { id: "completed", label: "Completed" },
 ];
 
 const SORTS: { id: CampaignSort; label: string }[] = [
@@ -35,13 +39,24 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q)?.slice(0, 64) ?? "";
 
   const repo = await getRepositoryForRequest();
-  const [campaigns, all] = await Promise.all([repo.listCampaigns({ filter, sort, search: q }), repo.listCampaigns()]);
-  const counts: Record<CampaignFilter, number> = {
+  const isTeasers = filter === "upcoming";
+  const all = repo.listCampaigns();
+  const pending = repo.listPendingApplicantMints();
+  const campaigns = isTeasers ? [] : repo.listCampaigns({ filter, sort, search: q });
+  const counts: Record<ExploreFilter, number> = {
     all: all.length,
-    approved: all.filter((c) => c.status === "active").length,
-    upcoming: all.filter((c) => c.status === "upcoming").length,
-    completed: all.filter((c) => c.status === "completed").length,
+    approved: all.filter((c) => c.status === "active" || c.status === "upcoming").length,
+    upcoming: pending.length,
   };
+
+  // Teasers carry only a live market cap. Names and addresses stay on the server.
+  let teasers: { key: string; marketCapUsd: number | null }[] = [];
+  if (isTeasers && pending.length > 0) {
+    const caps = await getLiveMarketCaps(pending.map((p) => p.contractAddress));
+    teasers = pending.map((p) => ({ key: p.id, marketCapUsd: caps.get(p.contractAddress) ?? null }));
+    if (sort === "market_cap") teasers.sort((a, b) => (b.marketCapUsd ?? -1) - (a.marketCapUsd ?? -1));
+  }
+  const teaserSorts = SORTS.filter((s) => s.id !== "allocation");
 
   const href = (next: Partial<{ filter: string; sort: string; q: string }>) => {
     const p = new URLSearchParams();
@@ -60,7 +75,11 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
       <PageHeader
         eyebrow="Campaign marketplace"
         title="Explore campaigns"
-        description="Every campaign below passed RUNNER's independent screening. Figures are captured at screening time and do not reflect current market conditions."
+        description={
+          isTeasers
+            ? "Projects that have applied and are still in screening. Details stay hidden until a project is approved; the market cap shown is live."
+            : "Every campaign below passed RUNNER's independent screening. Figures are captured at screening time and do not reflect current market conditions."
+        }
       />
 
       <div className="flex items-start gap-3 rounded-md border border-amber-400/25 bg-amber-400/[0.05] px-4 py-3 text-sm text-fg-muted">
@@ -93,6 +112,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         </nav>
 
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+          {!isTeasers && (
           <form action="/explore" className="relative" role="search">
             {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
             {sort !== "recent" && <input type="hidden" name="sort" value={sort} />}
@@ -105,10 +125,11 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
               className="field h-10 pl-9 sm:w-64"
             />
           </form>
+          )}
           <div className="flex min-w-0 items-center gap-2">
             <span className="label shrink-0">Sort</span>
             <div className="flex min-w-0 gap-1 overflow-x-auto rounded-md border border-ink-700 bg-ink-850 p-1">
-              {SORTS.map((s) => (
+              {(isTeasers ? teaserSorts : SORTS).map((s) => (
                 <Link
                   key={s.id}
                   href={href({ sort: s.id })}
@@ -126,7 +147,21 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         </div>
       </div>
 
-      {campaigns.length > 0 ? (
+      {isTeasers ? (
+        teasers.length > 0 ? (
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {teasers.map((t) => (
+              <TeaserCard key={t.key} marketCapUsd={t.marketCapUsd} />
+            ))}
+          </div>
+        ) : (
+          <div className="surface mt-8 flex flex-col items-center px-6 py-16 text-center">
+            <Inbox className="size-8 text-fg-subtle" aria-hidden />
+            <h2 className="mt-4 text-base font-semibold">No projects in screening</h2>
+            <p className="mt-2 max-w-sm text-sm text-fg-muted">New applicants will show up here while they&apos;re reviewed.</p>
+          </div>
+        )
+      ) : campaigns.length > 0 ? (
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {campaigns.map((c) => (
             <CampaignCard key={c.id} campaign={c} />

@@ -31,7 +31,8 @@ export function filterAndSortCampaigns(
   { filter = "all", sort = "recent", search }: { filter?: CampaignFilter; sort?: CampaignSort; search?: string } = {},
 ): Campaign[] {
   let list = campaigns.filter((c) => c.status !== "cancelled");
-  if (filter === "approved") list = list.filter((c) => c.status === "active");
+  // "Approved" = passed screening and not finished: live now or scheduled to start.
+  if (filter === "approved") list = list.filter((c) => c.status === "active" || c.status === "upcoming");
   if (filter === "upcoming") list = list.filter((c) => c.status === "upcoming");
   if (filter === "completed") list = list.filter((c) => c.status === "completed");
   if (search) {
