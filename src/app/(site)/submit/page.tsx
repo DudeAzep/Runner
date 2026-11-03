@@ -4,13 +4,16 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Container, PageHeader } from "@/components/layout/PageHeader";
 import { getPublicConfig } from "@/lib/config";
+import { PACKAGE_IDS } from "@/lib/economics/allocation";
 import { SubmitForm } from "./SubmitForm";
 
 export const metadata: Metadata = { title: "Submit a Project" };
 
-export default async function SubmitPage() {
+export default async function SubmitPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await connection(); // read settings at request time, not build time
   const cfg = getPublicConfig();
+  const requested = (await searchParams).package;
+  const initialPackage = PACKAGE_IDS.find((id) => id === requested);
   return (
     <Container className="max-w-4xl">
       <PageHeader
@@ -36,7 +39,7 @@ export default async function SubmitPage() {
         </div>
       </div>
 
-      <SubmitForm paymentsLive={cfg.paymentsLive} cluster={cfg.cluster} />
+      <SubmitForm paymentsLive={cfg.paymentsLive} cluster={cfg.cluster} initialPackage={initialPackage} />
     </Container>
   );
 }

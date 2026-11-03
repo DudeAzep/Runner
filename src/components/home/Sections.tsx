@@ -1,4 +1,5 @@
-import { BadgeCheck, Coins, Eye, FileText, History, Landmark, ScanSearch, Send, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Coins, Eye, FileText, History, Landmark, ScanSearch, Send, Users } from "lucide-react";
+import Link from "next/link";
 import { SectionHeading } from "@/components/layout/PageHeader";
 import { ALLOCATION_BPS, calculateCampaignAllocation, CAMPAIGN_PACKAGES, PACKAGE_IDS } from "@/lib/economics/allocation";
 import { formatUsdCents } from "@/lib/format";
@@ -56,7 +57,7 @@ export function HowItWorksSteps() {
 }
 
 export function AllocationExplainer() {
-  const example = calculateCampaignAllocation(100_000);
+  const example = calculateCampaignAllocation(25_000);
   const parts = [
     { pct: ALLOCATION_BPS.reward / 100, label: "Token purchases", body: "Treasury buys the approved project's token for holder distributions.", color: "bg-volt-400", cents: example.rewardUsdCents },
     { pct: ALLOCATION_BPS.operations / 100, label: "Operations", body: "Screening, infrastructure, security, and platform development.", color: "bg-violet-500", cents: example.operationsUsdCents },
@@ -67,7 +68,7 @@ export function AllocationExplainer() {
       <SectionHeading
         eyebrow="Revenue allocation"
         title="Where every campaign dollar goes"
-        description="Allocation is fixed by protocol rules and enforced in code and in the database. A $1,000 campaign always produces $700 / $200 / $100."
+        description="Allocation is fixed by protocol rules and enforced in code and in the database. A $250 campaign always produces $175 / $50 / $25."
       />
       <div className="surface p-6">
         <div className="flex h-3 gap-1 overflow-hidden rounded-sm" role="img" aria-label="70 / 20 / 10 allocation">
@@ -90,14 +91,16 @@ export function AllocationExplainer() {
           ))}
         </ul>
         <div className="mt-6 overflow-x-auto rounded-md border border-ink-700">
-          <table className="w-full min-w-[420px] text-left text-sm">
+          <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="bg-ink-900 text-xs text-fg-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">Package</th>
                 <th className="px-3 py-2 font-medium">Fee</th>
+                <th className="px-3 py-2 font-medium">Rec. market cap</th>
                 <th className="px-3 py-2 font-medium text-volt-400">70% rewards</th>
                 <th className="px-3 py-2 font-medium">20% ops</th>
                 <th className="px-3 py-2 font-medium">10% reserve</th>
+                <th className="px-3 py-2" aria-hidden />
               </tr>
             </thead>
             <tbody className="tabular divide-y divide-ink-700">
@@ -105,12 +108,21 @@ export function AllocationExplainer() {
                 const pk = CAMPAIGN_PACKAGES[id];
                 const a = calculateCampaignAllocation(pk.feeUsdCents);
                 return (
-                  <tr key={id}>
-                    <td className="px-3 py-2 font-medium">{pk.name}</td>
+                  // The package name link stretches over the whole row, so any part of the row is clickable.
+                  <tr key={id} className="group relative transition hover:bg-violet-500/[0.06]">
+                    <td className="px-3 py-2 font-medium">
+                      <Link href={`/submit?package=${id}#package`} className="after:absolute after:inset-0 after:content-['']">
+                        {pk.name}
+                      </Link>
+                    </td>
                     <td className="px-3 py-2">{formatUsdCents(a.totalUsdCents)}</td>
+                    <td className="px-3 py-2">{pk.recommendedMarketCap}</td>
                     <td className="px-3 py-2 text-volt-400">{formatUsdCents(a.rewardUsdCents)}</td>
                     <td className="px-3 py-2 text-fg-muted">{formatUsdCents(a.operationsUsdCents)}</td>
                     <td className="px-3 py-2 text-fg-muted">{formatUsdCents(a.reserveUsdCents)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <ArrowRight className="inline size-3.5 text-fg-subtle transition group-hover:translate-x-0.5 group-hover:text-violet-300" aria-hidden />
+                    </td>
                   </tr>
                 );
               })}

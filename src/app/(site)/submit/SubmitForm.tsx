@@ -65,6 +65,8 @@ function Section({ step, title, children }: { step: number; title: string; child
 interface PaymentConfig {
   paymentsLive: boolean;
   cluster: "mainnet-beta" | "devnet";
+  /** Preselected package, e.g. from /submit?package=starter. */
+  initialPackage?: CampaignPackageId;
 }
 
 export function SubmitForm(props: PaymentConfig) {
@@ -72,10 +74,10 @@ export function SubmitForm(props: PaymentConfig) {
   return <SubmitFormInner key={formKey} onReset={() => setFormKey((k) => k + 1)} {...props} />;
 }
 
-function SubmitFormInner({ onReset, paymentsLive, cluster }: { onReset: () => void } & PaymentConfig) {
+function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { onReset: () => void } & PaymentConfig) {
   const [state, action, pending] = useActionState<SubmitState, FormData>(submitApplication, { status: "idle" });
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
-  const [pkg, setPkg] = useState<CampaignPackageId>("growth");
+  const [pkg, setPkg] = useState<CampaignPackageId>(initialPackage ?? "growth");
   const [paid, setPaid] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const { publicKey } = useWallet();
@@ -199,7 +201,7 @@ function SubmitFormInner({ onReset, paymentsLive, cluster }: { onReset: () => vo
       </Section>
 
       <Section step={4} title="Campaign package">
-        <div role="radiogroup" aria-label="Campaign package" className="grid gap-3 md:grid-cols-3">
+        <div id="package" role="radiogroup" aria-label="Campaign package" className="grid gap-3 md:grid-cols-3">
           {PACKAGE_IDS.map((id) => {
             const p = CAMPAIGN_PACKAGES[id];
             const a = calculateCampaignAllocation(p.feeUsdCents);
@@ -231,6 +233,9 @@ function SubmitFormInner({ onReset, paymentsLive, cluster }: { onReset: () => vo
                   {formatUsdCents(p.feeUsdCents)} <span className="text-sm font-normal text-fg-subtle">USDC</span>
                 </span>
                 <span className="mt-1 text-xs text-fg-muted">{p.summary}</span>
+                <span className="mt-2 text-xs text-fg-muted">
+                  Recommended market cap: <span className="tabular font-medium text-fg">{p.recommendedMarketCap}</span>
+                </span>
                 <span className="tabular mt-3 text-xs text-volt-400">{formatUsdCents(a.rewardUsdCents)} reward pool if approved</span>
               </label>
             );

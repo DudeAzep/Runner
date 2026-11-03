@@ -31,6 +31,8 @@ export interface CampaignPackage {
   id: CampaignPackageId;
   name: string;
   feeUsdCents: number;
+  /** Recommended market cap range for a coin on this package, shown to applicants. */
+  recommendedMarketCap: string;
   summary: string;
   features: string[];
 }
@@ -39,21 +41,24 @@ export const CAMPAIGN_PACKAGES: Record<CampaignPackageId, CampaignPackage> = {
   starter: {
     id: "starter",
     name: "Starter",
-    feeUsdCents: 500_00,
+    feeUsdCents: 150_00,
+    recommendedMarketCap: "$10K–$50K",
     summary: "Entry campaign for early-stage projects.",
     features: ["Full independent screening", "Listing on Explore if approved", "Standard distribution slot"],
   },
   growth: {
     id: "growth",
     name: "Growth",
-    feeUsdCents: 1_000_00,
+    feeUsdCents: 250_00,
+    recommendedMarketCap: "$50K–$100K",
     summary: "Larger reward pool and wider holder reach.",
     features: ["Full independent screening", "Priority review queue", "Expanded reward pool", "Campaign detail page"],
   },
   featured: {
     id: "featured",
     name: "Featured",
-    feeUsdCents: 2_500_00,
+    feeUsdCents: 500_00,
+    recommendedMarketCap: "$100K+",
     summary: "Homepage placement for approved campaigns.",
     features: [
       "Full independent screening",

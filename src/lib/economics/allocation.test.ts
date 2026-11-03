@@ -19,10 +19,10 @@ describe("calculateCampaignAllocation", () => {
   });
 
   it("matches every package", () => {
-    assert.equal(allocationForPackage("starter").rewardUsdCents, 35_000);
-    assert.equal(allocationForPackage("growth").operationsUsdCents, 20_000);
-    assert.equal(allocationForPackage("featured").reserveUsdCents, 25_000);
-    assert.equal(CAMPAIGN_PACKAGES.featured.feeUsdCents, 250_000);
+    assert.equal(allocationForPackage("starter").rewardUsdCents, 10_500);
+    assert.equal(allocationForPackage("growth").operationsUsdCents, 5_000);
+    assert.equal(allocationForPackage("featured").reserveUsdCents, 5_000);
+    assert.equal(CAMPAIGN_PACKAGES.featured.feeUsdCents, 50_000);
   });
 
   it("always sums exactly to the total, with remainder going to reserve", () => {
@@ -43,8 +43,8 @@ describe("calculateCampaignAllocation", () => {
 
   it("aggregates and checks consistency", () => {
     const sum = sumAllocations([allocationForPackage("starter"), allocationForPackage("growth")]);
-    assert.equal(sum.totalUsdCents, 150_000);
-    assert.equal(sum.rewardUsdCents, 105_000);
+    assert.equal(sum.totalUsdCents, 40_000);
+    assert.equal(sum.rewardUsdCents, 28_000);
     assert.ok(isAllocationConsistent(sum));
     assert.equal(isAllocationConsistent({ ...sum, reserveUsdCents: sum.reserveUsdCents + 1 }), false);
   });
