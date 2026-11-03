@@ -41,7 +41,7 @@ export default async function HomePage() {
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <ButtonLink href="/explore" size="lg">
-                Explore Campaigns <ArrowRight className="size-4" />
+                Exploree Campaigns <ArrowRight className="size-4" />
               </ButtonLink>
               <ButtonLink href="/submit" size="lg" variant="secondary">
                 Submit Your Project
