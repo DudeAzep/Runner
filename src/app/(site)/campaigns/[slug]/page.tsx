@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { AllocationBar } from "@/components/campaign/AllocationBar";
+import { AllocationBar, campaignAllocation } from "@/components/campaign/AllocationBar";
 import { ProjectLogo } from "@/components/campaign/ProjectLogo";
 import { ScreeningReport } from "@/components/campaign/ScreeningReport";
 import { SocialLinks } from "@/components/campaign/SocialLinks";
@@ -146,7 +146,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ slug:
               <Row label="Package">{pkg.name}</Row>
               <Row label="Campaign fee">{formatUsdCents(c.totalCampaignFeeCents)} USDC</Row>
             </dl>
-            <AllocationBar totalCents={c.totalCampaignFeeCents} className="mt-4" />
+            <AllocationBar allocation={campaignAllocation(c)} className="mt-4" />
           </Panel>
 
           <Panel title="Treasury purchase allocation" icon={<Landmark className="size-4 text-volt-400" />}>

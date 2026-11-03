@@ -44,7 +44,7 @@ export default async function AdminOverviewPage() {
           hint={`Approved campaigns · ${formatUsdCents(verifiedRevenue)} verified USDC received on-chain`}
         />
         <StatisticsCard
-          label="Token purchase allocation (70%)"
+          label="Token purchase allocation"
           value={formatUsdCents(o.simulatedRewardAllocationCents)}
           icon={Landmark}
           accent="volt"

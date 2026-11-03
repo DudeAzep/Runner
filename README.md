@@ -2,7 +2,13 @@
 
 **Discover the Next Runner.** A curated Solana memecoin rewards platform.
 
-Projects apply and pay a USDC campaign fee. RUNNER screens every project independently. For approved campaigns, **70%** of the fee buys the project's token, and those tokens are distributed pro-rata to eligible RUNNER holders. **20%** goes to operations and **10%** to the treasury reserve.
+Projects apply and pay a USDC campaign fee. RUNNER screens every project independently. For approved campaigns, part of the fee buys the project's token, and those tokens are distributed pro-rata to eligible RUNNER holders. The rest goes to operations and the treasury reserve. Bigger packages put more into token purchases:
+
+| Package | Fee | Token purchases | Operations | Reserve | Recommended market cap |
+| --- | --- | --- | --- | --- | --- |
+| Starter | $500 | 70% | 20% | 10% | $10K–$50K |
+| Growth | $750 | 80% | 15% | 5% | $50K–$100K |
+| Featured | $2,000 | 90% | 7.5% | 2.5% | $100K+ |
 
 > Campaign participation does not guarantee token appreciation, liquidity, profits, or successful project outcomes. Fictional sample projects are labeled **DEMO DATA**.
 
@@ -38,7 +44,7 @@ Before you turn on real payments, get advice from a crypto-aware lawyer. Collect
 
 1. **Application.** The project applies and pays (verified on-chain in live mode).
 2. **Screening.** Click **Fetch on-chain data**. This reads mint and freeze authority, supply, the largest holders, and DexScreener liquidity, market cap, and volume, then pre-fills the screening form. Score the 8 criteria, add flags and notes, then approve or reject.
-3. **Campaign.** Create it from the approved application. The 70/20/10 split is fixed.
+3. **Campaign.** Create it from the approved application. The package's split is fixed when the campaign is created.
 4. **Purchase.** Get a Jupiter quote and sign with the treasury wallet. The server broadcasts the swap and verifies the treasury's balance changes. You can also paste the signature of a swap you made on jup.ag.
 5. **Snapshot.** Take an on-chain snapshot of every RUNNER holder, or import a CSV (`wallet,balance`). Excluded wallets are removed.
 6. **Distribute.** Create the plan. Amounts are pro-rata and rounded down, so the total never exceeds what was purchased. Then **Send all**: one wallet approval per batch of 5. Each batch is saved *before* it's broadcast and checked recipient by recipient afterwards, so a crash can never pay anyone twice. If a send is interrupted, **Check pending** resolves it.
@@ -63,7 +69,7 @@ Use **Export CSV** in the campaign's Distribution panel to download every recipi
 The smoke check forces simulated payments and treasury operations on its own temporary database and deletes that database afterwards. It does not test browser wallet signing or send on-chain transactions. CI runs it after the production build.
 
 Code map:
-- `src/lib/economics`: 70/20/10 allocation and proportional rewards (bigint, snapshot-based)
+- `src/lib/economics`: per-package fee allocation and proportional rewards (bigint, snapshot-based)
 - `src/lib/solana/server.ts`: all RPC, DexScreener, and Jupiter calls, plus transaction building
 - `src/lib/solana/verify.ts`: pure on-chain verification of payments, swaps, and transfers (unit-tested)
 - `src/lib/data/store.ts`: SQLite persistence

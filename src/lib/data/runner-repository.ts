@@ -1,5 +1,5 @@
 import "server-only";
-import { calculateCampaignAllocation, CAMPAIGN_PACKAGES, sumAllocations } from "@/lib/economics/allocation";
+import { allocationForPackage, CAMPAIGN_PACKAGES, sumAllocations } from "@/lib/economics/allocation";
 import { buildDistributionPlan, fromBaseUnits } from "@/lib/economics/rewards";
 import type {
   AdminOverview,
@@ -298,7 +298,7 @@ export class RunnerRepository {
     if (s.campaigns.some((c) => c.applicationId === applicationId)) throw new RepositoryError("A campaign already exists for this application.", "conflict");
     const screening = s.screenings.find((x) => x.applicationId === applicationId);
     const report = s.tokenReports.find((r) => r.applicationId === applicationId);
-    const alloc = calculateCampaignAllocation(CAMPAIGN_PACKAGES[app.campaignPackage].feeUsdCents);
+    const alloc = allocationForPackage(app.campaignPackage);
     let slug = slugify(app.projectName);
     if (s.campaigns.some((c) => c.slug === slug)) slug = `${slug}-${app.reference.slice(4).toLowerCase()}`;
     const t = now();
@@ -371,7 +371,7 @@ export class RunnerRepository {
     // Real swaps can land a few cents off the quote; allow 1% tolerance for verified purchases only.
     const tolerance = input.signature ? Math.ceil(c.rewardAllocationCents * 0.01) : 0;
     if (spent + input.usdcSpentCents > c.rewardAllocationCents + tolerance) {
-      throw new RepositoryError("Total purchases cannot exceed the campaign's 70% reward allocation.", "invalid_state");
+      throw new RepositoryError("Total purchases cannot exceed the campaign's reward allocation.", "invalid_state");
     }
     if (input.signature && this.isSignatureUsed(input.signature)) throw new RepositoryError("This transaction was already recorded.", "conflict");
     if (c.rewardDecimals != null && input.rewardDecimals != null && c.rewardDecimals !== input.rewardDecimals) {

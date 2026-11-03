@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { AdminForm } from "@/components/admin/AdminForm";
 import { ScreeningFields } from "@/components/admin/ScreeningFields";
 import { TokenReportPanel } from "@/components/admin/TokenReportPanel";
-import { AllocationBar } from "@/components/campaign/AllocationBar";
+import { AllocationBar, campaignAllocation } from "@/components/campaign/AllocationBar";
 import { ProjectLogo } from "@/components/campaign/ProjectLogo";
 import { averageScore } from "@/components/campaign/ScreeningReport";
 import { SocialLinks } from "@/components/campaign/SocialLinks";
@@ -13,7 +13,7 @@ import { ApplicationStatusBadge, CampaignStatusBadge } from "@/components/campai
 import { AddressChip } from "@/components/ui/AddressChip";
 import { Badge, SourceBadge } from "@/components/ui/Badge";
 import { adminRepository } from "@/lib/auth/admin-data";
-import { CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
+import { allocationForPackage, CAMPAIGN_PACKAGES } from "@/lib/economics/allocation";
 import { formatDateTime, formatUsdCents } from "@/lib/format";
 import { createCampaignAction, fetchTokenReportAction, saveScreeningAction, setApplicationStatusAction } from "../../../actions";
 import { getConfig } from "@/lib/config";
@@ -213,7 +213,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                   <span className="text-sm font-medium">{campaign.projectName}</span>
                   <CampaignStatusBadge status={campaign.status} />
                 </div>
-                <AllocationBar totalCents={campaign.totalCampaignFeeCents} />
+                <AllocationBar allocation={campaignAllocation(campaign)} />
                 <Link href={`/admin/campaigns/${campaign.id}`} className="inline-flex items-center gap-1 text-sm text-violet-300 hover:text-violet-200">
                   Manage campaign <ArrowUpRight className="size-3.5" />
                 </Link>
@@ -227,14 +227,15 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                   title: "Create campaign?",
                   body: (
                     <>
-                      Creates a public {pkg.name} campaign with a {formatUsdCents(pkg.feeUsdCents)} fee split 70/20/10. It will appear on Explore
+                      Creates a public {pkg.name} campaign with a {formatUsdCents(pkg.feeUsdCents)} fee split{" "}
+                      {pkg.allocationBps.reward / 100}/{pkg.allocationBps.operations / 100}/{pkg.allocationBps.reserve / 100}. It will appear on Explore
                       immediately.
                     </>
                   ),
                   confirmLabel: "Create",
                 }}
               >
-                <AllocationBar totalCents={pkg.feeUsdCents} />
+                <AllocationBar allocation={allocationForPackage(pkg.id)} />
                 <label className="block">
                   <span className="text-xs text-fg-muted">Initial status</span>
                   <select name="status" defaultValue="upcoming" className="field mt-1">

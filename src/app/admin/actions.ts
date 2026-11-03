@@ -227,7 +227,7 @@ export async function prepareSwapAction(campaignId: string, usdcAmount: string):
     const cents = Number(usdcRaw / 10_000n);
     const spent = detail.purchases.reduce((s, p) => s + p.usdcSpentCents, 0);
     if (usdcRaw <= 0n) throw new ValidationFailure("Amount must be positive.");
-    if (spent + cents > detail.campaign.rewardAllocationCents) throw new ValidationFailure("That exceeds the remaining 70% reward allocation.");
+    if (spent + cents > detail.campaign.rewardAllocationCents) throw new ValidationFailure("That exceeds the remaining reward allocation.");
     const mint = await getMintInfo(detail.campaign.tokenAddress);
     const swap = await buildTreasurySwap({ outputMint: detail.campaign.tokenAddress, usdcRaw });
     void cfg;

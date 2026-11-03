@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { AdminForm } from "@/components/admin/AdminForm";
 import { DistributionSender } from "@/components/admin/DistributionSender";
 import { TreasurySwapPanel } from "@/components/admin/TreasurySwapPanel";
-import { AllocationBar } from "@/components/campaign/AllocationBar";
+import { AllocationBar, campaignAllocation } from "@/components/campaign/AllocationBar";
 import { ProjectLogo } from "@/components/campaign/ProjectLogo";
 import { campaignStatusLabel, CampaignStatusBadge } from "@/components/campaign/StatusBadges";
 import { AddressChip } from "@/components/ui/AddressChip";
@@ -103,7 +103,7 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
           {/* 1. Purchases */}
-          <Panel step={1} title="Treasury purchase (70% allocation)" aside={<Badge tone={live ? "volt" : "amber"}>{live ? "On-chain" : "Simulated"}</Badge>}>
+          <Panel step={1} title="Treasury purchase (reward allocation)" aside={<Badge tone={live ? "volt" : "amber"}>{live ? "On-chain" : "Simulated"}</Badge>}>
             <dl className="tabular grid grid-cols-3 gap-3 text-sm">
               <div>
                 <dt className="text-xs text-fg-subtle">Allocation</dt>
@@ -354,7 +354,7 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
             <div className="tabular text-sm text-fg-muted">
               Fee <span className="text-fg">{formatUsdCents(c.totalCampaignFeeCents)}</span>
             </div>
-            <AllocationBar totalCents={c.totalCampaignFeeCents} className="mt-3" />
+            <AllocationBar allocation={campaignAllocation(c)} className="mt-3" />
           </Panel>
 
           <Panel title="Quick status change">

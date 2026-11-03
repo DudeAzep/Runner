@@ -28,7 +28,7 @@ export default async function AdminCampaignsPage() {
               <th className="px-4 py-3 font-medium">Campaign</th>
               <th className="py-3 font-medium">Package</th>
               <th className="py-3 text-right font-medium">Fee</th>
-              <th className="py-3 text-right font-medium">70% rewards</th>
+              <th className="py-3 text-right font-medium">Rewards</th>
               <th className="py-3 pl-6 font-medium">Risk</th>
               <th className="py-3 font-medium">Snapshot</th>
               <th className="px-4 py-3 font-medium">Status</th>

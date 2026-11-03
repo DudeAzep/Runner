@@ -2,7 +2,7 @@ import { ArrowRight, Coins, Landmark, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { ProjectLogo } from "@/components/campaign/ProjectLogo";
 import { CampaignStatusBadge } from "@/components/campaign/StatusBadges";
-import { calculateCampaignAllocation } from "@/lib/economics/allocation";
+import { campaignAllocation } from "@/components/campaign/AllocationBar";
 import { formatUsdCents } from "@/lib/format";
 import { HolderShareBox } from "./HolderShareBox";
 import { SCREENING_CRITERIA, type Campaign, type Screening } from "@/lib/types";
@@ -12,7 +12,8 @@ const PASS_SCORE = 6;
 
 /** Hero visual: how one campaign fee flows to holders, using a real (demo) campaign record. */
 export function HeroFlow({ campaign, screening }: { campaign: Campaign; screening: Screening | null }) {
-  const a = calculateCampaignAllocation(campaign.totalCampaignFeeCents);
+  // Use the split stored on the campaign (each package has its own).
+  const a = campaignAllocation(campaign);
   const total = SCREENING_CRITERIA.length;
   const passed = screening ? SCREENING_CRITERIA.filter((c) => screening[c.key] >= PASS_SCORE).length : null;
   const screeningValue = passed != null ? `${passed}/${total} checks · ${Math.round((passed / total) * 100)}%` : `${total} checks`;

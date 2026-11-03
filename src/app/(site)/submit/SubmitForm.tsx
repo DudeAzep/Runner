@@ -8,7 +8,7 @@ import { PayWithWallet } from "@/components/wallet/PayWithWallet";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
-import { calculateCampaignAllocation, CAMPAIGN_PACKAGES, PACKAGE_IDS, type CampaignPackageId } from "@/lib/economics/allocation";
+import { allocationForPackage, CAMPAIGN_PACKAGES, PACKAGE_IDS, type CampaignPackageId } from "@/lib/economics/allocation";
 import { formatDateTime, formatUsdCents } from "@/lib/format";
 import { applicationSchema } from "@/lib/validation/schemas";
 import { submitApplication, type SubmitState } from "./actions";
@@ -116,7 +116,8 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
   );
 
   const selected = CAMPAIGN_PACKAGES[pkg];
-  const alloc = calculateCampaignAllocation(selected.feeUsdCents);
+  const alloc = allocationForPackage(pkg);
+  const pct = (bps: number) => `${bps / 100}%`;
 
   const simulatePayment = () => {
     setPaying(true);
@@ -204,30 +205,37 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
         <div id="package" role="radiogroup" aria-label="Campaign package" className="grid gap-3 md:grid-cols-3">
           {PACKAGE_IDS.map((id) => {
             const p = CAMPAIGN_PACKAGES[id];
-            const a = calculateCampaignAllocation(p.feeUsdCents);
-            const on = pkg === id;
+            const a = allocationForPackage(id);
+            const best = id === "featured";
             return (
+              // Selected styling is driven by CSS (:checked), so the card switches on click even before the page's script has loaded.
               <label
                 key={id}
                 className={cn(
-                  "relative flex cursor-pointer flex-col rounded-md border p-4 transition",
-                  on ? "border-violet-500 bg-violet-500/[0.07] shadow-[0_0_0_1px_rgb(139_92_246/0.5)]" : "border-ink-600 bg-ink-900 hover:border-ink-500",
+                  "group relative flex cursor-pointer flex-col rounded-md border border-ink-600 bg-ink-900 p-4 transition hover:border-ink-500",
+                  "has-[:checked]:border-violet-500 has-[:checked]:bg-violet-500/[0.07] has-[:checked]:shadow-[0_0_0_1px_rgb(139_92_246/0.5)]",
+                  "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-violet-400",
                 )}
               >
                 <input
                   type="radio"
                   name="campaignPackage"
                   value={id}
-                  checked={on}
+                  checked={pkg === id}
                   onChange={() => {
                     setPkg(id);
                     setPaid(null);
                   }}
                   className="sr-only"
                 />
+                {best && (
+                  <span className="absolute -top-2.5 right-3 rounded-full bg-volt-400 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-950">
+                    Best value
+                  </span>
+                )}
                 <span className="flex items-center justify-between">
                   <span className="label text-fg-muted">{p.name}</span>
-                  {on && <CircleCheck className="size-4 text-violet-400" aria-hidden />}
+                  <CircleCheck className="hidden size-4 text-violet-400 group-has-[:checked]:block" aria-hidden />
                 </span>
                 <span className="tabular mt-2 text-2xl font-semibold tracking-tight">
                   {formatUsdCents(p.feeUsdCents)} <span className="text-sm font-normal text-fg-subtle">USDC</span>
@@ -236,7 +244,12 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
                 <span className="mt-2 text-xs text-fg-muted">
                   Recommended market cap: <span className="tabular font-medium text-fg">{p.recommendedMarketCap}</span>
                 </span>
-                <span className="tabular mt-3 text-xs text-volt-400">{formatUsdCents(a.rewardUsdCents)} reward pool if approved</span>
+                <span className="mt-3 flex items-baseline justify-between gap-2 border-t border-ink-700 pt-3">
+                  <span className="tabular text-sm font-semibold text-volt-400">{formatUsdCents(a.rewardUsdCents)} reward pool</span>
+                  <span className="tabular rounded bg-volt-400/10 px-1.5 py-0.5 text-[11px] font-medium text-volt-400">
+                    {pct(p.allocationBps.reward)} to rewards
+                  </span>
+                </span>
               </label>
             );
           })}
@@ -252,7 +265,7 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
           </div>
           <p className="mt-3 text-sm text-fg-muted">
             After you submit, you&apos;ll pay the fee in USDC from your Solana wallet. The payment is verified on-chain before screening
-            begins. If approved, {formatUsdCents(alloc.rewardUsdCents)} (70%) is used to buy your token for RUNNER holders.
+            begins. If approved, {formatUsdCents(alloc.rewardUsdCents)} ({pct(selected.allocationBps.reward)}) is used to buy your token for RUNNER holders.
           </p>
         </div>
       ) : (
@@ -282,11 +295,13 @@ function SubmitFormInner({ onReset, paymentsLive, cluster, initialPackage }: { o
               <dd className="mt-0.5 font-medium">{formatUsdCents(alloc.totalUsdCents)} USDC</dd>
             </div>
             <div>
-              <dt className="text-xs text-fg-subtle">70% purchases</dt>
+              <dt className="text-xs text-fg-subtle">{pct(selected.allocationBps.reward)} purchases</dt>
               <dd className="mt-0.5 font-medium text-volt-400">{formatUsdCents(alloc.rewardUsdCents)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-fg-subtle">20% / 10%</dt>
+              <dt className="text-xs text-fg-subtle">
+                {pct(selected.allocationBps.operations)} / {pct(selected.allocationBps.reserve)}
+              </dt>
               <dd className="mt-0.5 font-medium text-fg-muted">
                 {formatUsdCents(alloc.operationsUsdCents)} / {formatUsdCents(alloc.reserveUsdCents)}
               </dd>

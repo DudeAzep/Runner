@@ -67,17 +67,18 @@ describe("RunnerRepository lifecycle", () => {
     assert.throws(() => repo.markApplicationPaid(other.reference, { signature: sig, payer: W1 }), /already used/);
   });
 
-  it("approves and creates a campaign with a 70/20/10 split", () => {
+  it("approves and creates a campaign with its package's split", () => {
     repo.setApplicationStatus(appId, "approved");
     const c = repo.createCampaignFromApplication(appId, { status: "active", featured: false, snapshotAt: null });
     campaignId = c.id;
-    assert.equal(c.rewardAllocationCents, 10_500);
-    assert.equal(c.operationsAllocationCents + c.reserveAllocationCents + c.rewardAllocationCents, 15_000);
+    // Starter: $500 at 70/20/10.
+    assert.equal(c.rewardAllocationCents, 35_000);
+    assert.equal(c.operationsAllocationCents + c.reserveAllocationCents + c.rewardAllocationCents, 50_000);
   });
 
   it("enforces the purchase cap", () => {
-    assert.throws(() => repo.recordPurchase(campaignId, { usdcSpentCents: 10_501, tokenAmount: "1", notes: "", signature: null, rewardDecimals: null }), /70%/);
-    repo.recordPurchase(campaignId, { usdcSpentCents: 10_500, tokenAmount: "1000", notes: "", signature: null, rewardDecimals: 6 });
+    assert.throws(() => repo.recordPurchase(campaignId, { usdcSpentCents: 35_001, tokenAmount: "1", notes: "", signature: null, rewardDecimals: null }), /reward allocation/);
+    repo.recordPurchase(campaignId, { usdcSpentCents: 35_000, tokenAmount: "1000", notes: "", signature: null, rewardDecimals: 6 });
   });
 
   it("snapshots with exclusions and plans a pro-rata distribution that never exceeds the pool", () => {

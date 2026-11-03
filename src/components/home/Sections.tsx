@@ -1,7 +1,7 @@
 import { ArrowRight, BadgeCheck, Coins, Eye, FileText, History, Landmark, ScanSearch, Send, Users } from "lucide-react";
 import Link from "next/link";
 import { SectionHeading } from "@/components/layout/PageHeader";
-import { ALLOCATION_BPS, calculateCampaignAllocation, CAMPAIGN_PACKAGES, PACKAGE_IDS } from "@/lib/economics/allocation";
+import { allocationForPackage, CAMPAIGN_PACKAGES, PACKAGE_IDS } from "@/lib/economics/allocation";
 import { formatUsdCents } from "@/lib/format";
 
 const STEPS = [
@@ -18,7 +18,7 @@ const STEPS = [
   {
     icon: Landmark,
     title: "Treasury purchases",
-    body: "For approved campaigns, 70% of the fee is used by the treasury to buy the project's token on the open market.",
+    body: "For approved campaigns, 70–90% of the fee (more on bigger packages) is used by the treasury to buy the project's token on the open market.",
   },
   {
     icon: Users,
@@ -57,21 +57,35 @@ export function HowItWorksSteps() {
 }
 
 export function AllocationExplainer() {
-  const example = calculateCampaignAllocation(25_000);
+  // The breakdown shows the Featured package; the table below compares all three.
+  const featured = CAMPAIGN_PACKAGES.featured;
+  const bps = featured.allocationBps;
+  const example = allocationForPackage("featured");
   const parts = [
-    { pct: ALLOCATION_BPS.reward / 100, label: "Token purchases", body: "Treasury buys the approved project's token for holder distributions.", color: "bg-volt-400", cents: example.rewardUsdCents },
-    { pct: ALLOCATION_BPS.operations / 100, label: "Operations", body: "Screening, infrastructure, security, and platform development.", color: "bg-violet-500", cents: example.operationsUsdCents },
-    { pct: ALLOCATION_BPS.reserve / 100, label: "Treasury reserve", body: "Held for contingencies and future ecosystem needs.", color: "bg-ink-500", cents: example.reserveUsdCents },
+    { pct: bps.reward / 100, label: "Token purchases", body: "Treasury buys the approved project's token for holder distributions.", color: "bg-volt-400", cents: example.rewardUsdCents },
+    { pct: bps.operations / 100, label: "Operations", body: "Screening, infrastructure, security, and platform development.", color: "bg-violet-500", cents: example.operationsUsdCents },
+    { pct: bps.reserve / 100, label: "Treasury reserve", body: "Held for contingencies and future ecosystem needs.", color: "bg-ink-500", cents: example.reserveUsdCents },
   ];
+  const rewardShares = PACKAGE_IDS.map((id) => `${CAMPAIGN_PACKAGES[id].name} ${CAMPAIGN_PACKAGES[id].allocationBps.reward / 100}%`).join(", ");
   return (
     <div id="allocation" className="grid scroll-mt-24 gap-10 lg:grid-cols-[1fr_1.15fr] lg:items-center [&>*]:min-w-0">
       <SectionHeading
         eyebrow="Revenue allocation"
         title="Where every campaign dollar goes"
-        description="Allocation is fixed by protocol rules and enforced in code and in the database. A $250 campaign always produces $175 / $50 / $25."
+        description={`Each package's split is fixed by protocol rules and enforced in code. Bigger packages put more of the fee into token purchases for holders: ${rewardShares}.`}
       />
       <div className="surface p-6">
-        <div className="flex h-3 gap-1 overflow-hidden rounded-sm" role="img" aria-label="70 / 20 / 10 allocation">
+        <div className="mb-3 flex items-center justify-between text-xs text-fg-subtle">
+          <span>
+            {featured.name} package · {formatUsdCents(featured.feeUsdCents)}
+          </span>
+          <span className="rounded-full bg-volt-400 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-950">Best value</span>
+        </div>
+        <div
+          className="flex h-3 gap-1 overflow-hidden rounded-sm"
+          role="img"
+          aria-label={`${bps.reward / 100} / ${bps.operations / 100} / ${bps.reserve / 100} allocation`}
+        >
           {parts.map((p) => (
             <div key={p.label} className={p.color} style={{ width: `${p.pct}%` }} />
           ))}
@@ -91,22 +105,23 @@ export function AllocationExplainer() {
           ))}
         </ul>
         <div className="mt-6 overflow-x-auto rounded-md border border-ink-700">
-          <table className="w-full min-w-[520px] text-left text-sm">
+          <table className="w-full min-w-[600px] text-left text-sm">
             <thead className="bg-ink-900 text-xs text-fg-subtle">
               <tr>
                 <th className="px-3 py-2 font-medium">Package</th>
                 <th className="px-3 py-2 font-medium">Fee</th>
                 <th className="px-3 py-2 font-medium">Rec. market cap</th>
-                <th className="px-3 py-2 font-medium text-volt-400">70% rewards</th>
-                <th className="px-3 py-2 font-medium">20% ops</th>
-                <th className="px-3 py-2 font-medium">10% reserve</th>
+                <th className="px-3 py-2 font-medium text-volt-400">Rewards</th>
+                <th className="px-3 py-2 font-medium">Ops</th>
+                <th className="px-3 py-2 font-medium">Reserve</th>
                 <th className="px-3 py-2" aria-hidden />
               </tr>
             </thead>
             <tbody className="tabular divide-y divide-ink-700">
               {PACKAGE_IDS.map((id) => {
                 const pk = CAMPAIGN_PACKAGES[id];
-                const a = calculateCampaignAllocation(pk.feeUsdCents);
+                const a = allocationForPackage(id);
+                const b = pk.allocationBps;
                 return (
                   // The package name link stretches over the whole row, so any part of the row is clickable.
                   <tr key={id} className="group relative transition hover:bg-violet-500/[0.06]">
@@ -117,9 +132,15 @@ export function AllocationExplainer() {
                     </td>
                     <td className="px-3 py-2">{formatUsdCents(a.totalUsdCents)}</td>
                     <td className="px-3 py-2">{pk.recommendedMarketCap}</td>
-                    <td className="px-3 py-2 text-volt-400">{formatUsdCents(a.rewardUsdCents)}</td>
-                    <td className="px-3 py-2 text-fg-muted">{formatUsdCents(a.operationsUsdCents)}</td>
-                    <td className="px-3 py-2 text-fg-muted">{formatUsdCents(a.reserveUsdCents)}</td>
+                    <td className="px-3 py-2 text-volt-400">
+                      {formatUsdCents(a.rewardUsdCents)} <span className="text-xs font-semibold">· {b.reward / 100}%</span>
+                    </td>
+                    <td className="px-3 py-2 text-fg-muted">
+                      {formatUsdCents(a.operationsUsdCents)} <span className="text-xs text-fg-subtle">· {b.operations / 100}%</span>
+                    </td>
+                    <td className="px-3 py-2 text-fg-muted">
+                      {formatUsdCents(a.reserveUsdCents)} <span className="text-xs text-fg-subtle">· {b.reserve / 100}%</span>
+                    </td>
                     <td className="px-3 py-2 text-right">
                       <ArrowRight className="inline size-3.5 text-fg-subtle transition group-hover:translate-x-0.5 group-hover:text-violet-300" aria-hidden />
                     </td>

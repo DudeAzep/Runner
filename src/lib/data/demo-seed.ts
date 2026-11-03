@@ -9,7 +9,7 @@
  * - No transaction signatures are included. Simulated purchases and
  *   distributions have `transactionSignature: null`.
  */
-import { calculateCampaignAllocation, CAMPAIGN_PACKAGES, type CampaignPackageId } from "@/lib/economics/allocation";
+import { allocationForPackage, type CampaignPackageId } from "@/lib/economics/allocation";
 import { calculateHolderReward, fromBaseUnits, toBaseUnits } from "@/lib/economics/rewards";
 import type { Application, Campaign, Distribution, Screening, Snapshot, SnapshotHolders, TokenReport, TreasuryPurchase } from "@/lib/types";
 
@@ -339,7 +339,7 @@ export function createDemoSeed(): DemoSeed {
     });
 
     if (!p.campaign) return;
-    const alloc = calculateCampaignAllocation(CAMPAIGN_PACKAGES[p.pkg].feeUsdCents);
+    const alloc = allocationForPackage(p.pkg);
     const campaignId = `demo-cmp-${p.slug}`;
     campaigns.push({
       id: campaignId,
