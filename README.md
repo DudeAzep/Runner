@@ -43,6 +43,8 @@ Before you turn on real payments, get advice from a crypto-aware lawyer. Collect
 5. **Snapshot.** Take an on-chain snapshot of every RUNNER holder, or import a CSV (`wallet,balance`). Excluded wallets are removed.
 6. **Distribute.** Create the plan. Amounts are pro-rata and rounded down, so the total never exceeds what was purchased. Then **Send all**: one wallet approval per batch of 5. Each batch is saved *before* it's broadcast and checked recipient by recipient afterwards, so a crash can never pay anyone twice. If a send is interrupted, **Check pending** resolves it.
 
+Use **Export CSV** in the campaign's Distribution panel to download every recipient, including rows beyond the 200 shown on screen. The export includes full wallet addresses, snapshot IDs, exact raw and decimal token amounts, statuses, transaction signatures, and data sources. A planned or simulated row does not mean tokens were sent. When importing into a spreadsheet, set raw amounts and identifiers to text to preserve every digit.
+
 **The server never holds a private key.** It builds transactions, your wallet signs them, and the server submits and verifies them.
 
 ## Running it for real (hosting)
@@ -55,7 +57,10 @@ Before you turn on real payments, get advice from a crypto-aware lawyer. Collect
 | --- | --- |
 | `npm run dev` | Dev server |
 | `npm test` | Unit tests: economics, rewards, transaction verification, repository lifecycle |
+| `npm run test:smoke` | After a build: start a temporary local server and check public/admin pages and CSV export access/content using an isolated demo database |
 | `npm run verify` | Typecheck, lint, test, and build |
+
+The smoke check forces simulated payments and treasury operations on its own temporary database and deletes that database afterwards. It does not test browser wallet signing or send on-chain transactions. CI runs it after the production build.
 
 Code map:
 - `src/lib/economics`: 70/20/10 allocation and proportional rewards (bigint, snapshot-based)

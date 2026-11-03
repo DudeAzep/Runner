@@ -2,6 +2,13 @@
 
 Status as of the last session. Read `AGENTS.md` too: this is Next.js 16, so check `node_modules/next/dist/docs/` before relying on older APIs.
 
+## This computer: November 2, 2026
+- Installed locked dependencies and generated local test-mode settings with `npm run setup`.
+- Added admin-only distribution CSV exports from each campaign, including all rows, exact amounts, statuses, signatures, and provenance. The route checks its own admin session and sends private/no-store download headers.
+- Added six CSV unit tests and `npm run test:smoke`, an isolated production-server HTTP check using disposable demo data. CI now runs the smoke check after building.
+- Verified 44 unit tests, typecheck, lint, production build, and HTTP smoke checks here. Browser sign-in also succeeded. These checks do not verify wallet signing or real on-chain operations.
+- The installed system Node 24.20.0 failed to start Turbopack's CSS worker even outside the sandbox. The existing bundled Node 24.22.1 at `C:\Users\camer\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe` built successfully when its directory was first on PATH. Use that runtime on this machine pending a system-runtime fix; no runtime was installed or upgraded.
+
 ## Done and verified
 - Full public site and admin, Tailwind v4 design system, Next 16 App Router with `cacheComponents: false`.
 - Storage moved from Supabase to **SQLite via `node:sqlite`** (`src/lib/data/store.ts`): JSON-document tables, write-through cache, demo seed on first run. Supabase was removed entirely.
@@ -27,6 +34,6 @@ Status as of the last session. Read `AGENTS.md` too: this is Next.js 16, so chec
 ## Suggested next steps
 - `Dockerfile` exists but hasn't been built or tested yet.
 - Devnet testing mode for purchases: allow simulated purchases when `cluster=devnet` even if `TREASURY_MODE=live`.
-- Admin audit log (who did what, when) and CSV export of distributions.
+- Admin audit log (who did what, when). Distribution CSV export is implemented above.
 - Optional: Helius DAS holder count in token reports when the RPC is Helius.
 - Before mainnet: a security review of `src/app/admin/actions.ts` and `src/lib/solana/*`, plus legal review.

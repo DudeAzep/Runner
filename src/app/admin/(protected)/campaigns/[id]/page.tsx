@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, Camera, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Camera, Download, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
@@ -246,7 +246,14 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
           </Panel>
 
           {/* 3. Distribution */}
-          <Panel step={3} title="Distribution" aside={<Badge tone={live ? "volt" : "amber"}>{live ? "On-chain transfers" : "Simulated"}</Badge>}>
+          <Panel step={3} title="Distribution" aside={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <a href={`/admin/campaigns/${c.id}/distributions.csv`} download className="inline-flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200">
+                <Download className="size-3.5" /> Export CSV
+              </a>
+              <Badge tone={live ? "volt" : "amber"}>{live ? "On-chain transfers" : "Simulated"}</Badge>
+            </div>
+          }>
             <dl className="tabular grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <div>
                 <dt className="text-xs text-fg-subtle">Recipients</dt>
